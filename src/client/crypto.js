@@ -2,8 +2,18 @@ import crypto from "node:crypto";
 
 import { stableStringify } from "../util.js";
 
-const ENVELOPE_ALGORITHM = "X25519+HKDF-SHA256+AES-256-GCM+Ed25519";
+export const ENVELOPE_ALGORITHM = "RMP-PROTOTYPE-X25519-HKDF-SHA256-AES-256-GCM-ED25519";
 const HKDF_INFO = Buffer.from("rmp-envelope-v1", "utf8");
+
+export function getEnvelopeSecurityProfile() {
+  return {
+    algorithm: ENVELOPE_ALGORITHM,
+    relayReadable: false,
+    productionReady: false,
+    reason:
+      "This envelope layer protects payloads from relays, but production E2EE still requires Double Ratchet for 1:1 chats and MLS for groups.",
+  };
+}
 
 function createKeyObjectsFromPem({ publicKeyPem, privateKeyPem }) {
   return {
@@ -85,6 +95,11 @@ export function openPayload({
   senderSigningPublicKeyPem,
 }) {
   const parsed = JSON.parse(ciphertext);
+
+  if (parsed.body?.alg !== ENVELOPE_ALGORITHM) {
+    throw new Error("Unsupported envelope algorithm");
+  }
+
   const expectedAad = {
     conversationId: envelope.conversationId,
     senderAccountId: envelope.sender.accountId,

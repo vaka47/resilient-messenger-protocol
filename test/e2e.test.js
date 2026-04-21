@@ -72,6 +72,9 @@ test("end-to-end send fans out to multiple devices and returns delivery acks", a
   alice = sendResult.state;
   await saveLocalState(aliceDir, alice);
 
+  const relaySnapshotAfterSend = await fs.readFile(dataFile, "utf8");
+  assert.equal(relaySnapshotAfterSend.includes("resilient hello"), false);
+
   const phoneSync = await syncInboxWithApi({
     baseUrl: "memory://protocol",
     state: bobPhone,

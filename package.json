@@ -3,6 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "description": "Reference protocol starter for a resilient local-first messenger.",
+  "license": "MIT",
+  "author": "vaka47",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vaka47/resilient-messenger-protocol.git"
+  },
+  "keywords": [
+    "messenger",
+    "e2ee",
+    "local-first",
+    "relay",
+    "protocol",
+    "resilience"
+  ],
   "type": "module",
   "scripts": {
     "test": "node --test",

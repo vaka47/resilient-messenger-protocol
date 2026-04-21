@@ -46,6 +46,8 @@ These are not invented in-house:
 - `group messaging`: MLS-like group state and key updates.
 - `primitives`: AEAD, HKDF, secure signatures, CSPRNG from mature libraries.
 
+The current codebase contains only a prototype envelope sealing layer. It is useful for demonstrating that relays do not need plaintext access, but it is not a replacement for ratcheted production chat encryption.
+
 ### 3.2 What is novel
 
 These are the areas of differentiation:
@@ -212,6 +214,8 @@ Stores:
 - expiry and delivery state.
 
 It should not store permanent message history.
+
+It must never receive plaintext payloads or private keys.
 
 ### 8.3 Push bridge
 

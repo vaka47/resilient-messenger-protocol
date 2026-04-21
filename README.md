@@ -1,29 +1,102 @@
 # Resilient Messenger Protocol
 
-This repository starts with two things:
+[![CI](https://github.com/vaka47/resilient-messenger-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/vaka47/resilient-messenger-protocol/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-- a `v1` protocol specification for a resilient, local-first messenger;
-- a growing reference implementation for message envelopes, transport selection, relay storage, client state, and end-to-end delivery.
+Prototype of a server-light, local-first messenger protocol for unreliable or hostile networks.
 
-## Goals
+The project explores a practical question: what should a messenger do when normal internet delivery is degraded, blocked, delayed, or too expensive to centralize?
 
-- Keep cryptography standard and well-vetted.
-- Innovate in delivery, transport failover, identity, replication, and server-light storage.
-- Default to local-first behavior and delay-tolerant messaging.
+## Highlights
 
-## Structure
+- Transport-agnostic encrypted envelopes.
+- File-backed directory and relay server.
+- Local device identity with linked devices.
+- Multi-device recipient fanout.
+- Delivery acknowledgements back to the sender.
+- Local append-only event history.
+- CLI demo and end-to-end tests.
+- Explicit security model and production crypto roadmap.
 
-- `docs/protocol-v1.md`: protocol goals, server roles, packet model, and message lifecycle.
-- `src/`: reference implementation of protocol decisions, relay server, client state, and CLI.
-- `test/`: executable tests for the reference layer.
+## Why It Exists
 
-## Run
+Most messengers assume the network is usually available and the provider can afford large centralized storage. This prototype takes a different direction:
+
+- clients own message history;
+- relays store only encrypted queue items with bounded retention;
+- the protocol can later route over multiple transports;
+- server cost should scale closer to temporary delivery load than permanent cloud history.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Alice["Alice device"] -->|"sealed envelope"| Relay["Relay queue"]
+  Relay -->|"ciphertext only"| BobPhone["Bob phone"]
+  Relay -->|"ciphertext only"| BobLaptop["Bob laptop"]
+  BobPhone -->|"encrypted delivery ack"| Relay
+  BobLaptop -->|"encrypted delivery ack"| Relay
+  Relay -->|"acks"| Alice
+  Directory["Directory service"] -. "device public keys, inbox ids" .-> Alice
+  Directory -. "device public keys, inbox ids" .-> BobPhone
+```
+
+Detailed docs:
+
+- [Protocol v1](docs/protocol-v1.md)
+- [Architecture](docs/architecture.md)
+- [Security model](docs/security-model.md)
+- [Crypto roadmap](docs/crypto-roadmap.md)
+- [Demo script](docs/demo.md)
+- [Roadmap](docs/roadmap.md)
+- [Commercialization paths](docs/commercialization.md)
+
+## Current Scope
+
+This is a protocol/backend prototype, not a production mobile app.
+
+Implemented:
+
+- local device identity;
+- linked devices for one account;
+- directory registration;
+- relay queue delivery with encrypted delivery ack;
+- signed and encrypted `1:1` envelopes for text payloads;
+- multi-device recipient fanout;
+- local event history on each device;
+- end-to-end tests for send, receive, decrypt, ack, and status update.
+
+Not implemented yet:
+
+- production Double Ratchet sessions;
+- MLS group encryption;
+- nearby Bluetooth/Wi-Fi transport;
+- Android/iOS client;
+- push notifications;
+- device recovery and revocation UX.
+
+## Security Position
+
+The relay server must never receive plaintext messages or private keys. In the current prototype, message content is sealed on the sender device and can only be opened with the recipient device private key.
+
+Important limitation: the current envelope crypto is a prototype layer built from standard Node.js primitives (`X25519`, `HKDF-SHA256`, `AES-256-GCM`, `Ed25519`). It demonstrates the end-to-end boundary but is not yet a full production E2EE messenger design.
+
+For production, the plan is:
+
+- `1:1`: X3DH/PQXDH-style session setup plus Double Ratchet.
+- `groups`: MLS-style group state.
+- `post-compromise recovery`: ratcheted message keys.
+- `metadata minimization`: rotating inbox ids and bounded relay retention.
+
+See [Security model](docs/security-model.md) and [Crypto roadmap](docs/crypto-roadmap.md).
+
+## Quickstart
+
+Run tests:
 
 ```bash
 npm test
 ```
-
-## MVP Demo
 
 Start the relay and directory server:
 
@@ -31,14 +104,12 @@ Start the relay and directory server:
 npm run server -- --port 8080
 ```
 
-In another terminal, initialize and register Alice:
+Initialize and register Alice:
 
 ```bash
 node src/cli.js init --state-dir ./state/alice --name Alice
 node src/cli.js register --state-dir ./state/alice --base-url http://127.0.0.1:8080
 ```
-
-`init` refuses to overwrite existing state unless you pass `--force`.
 
 Initialize and register Bob:
 
@@ -47,41 +118,59 @@ node src/cli.js init --state-dir ./state/bob --name Bob
 node src/cli.js register --state-dir ./state/bob --base-url http://127.0.0.1:8080
 ```
 
-Add a second Bob device if you want to test multi-device fanout:
+Add Bob's second device:
 
 ```bash
 node src/cli.js link-device --from-state-dir ./state/bob --state-dir ./state/bob-laptop
 node src/cli.js register --state-dir ./state/bob-laptop --base-url http://127.0.0.1:8080
 ```
 
-Send a text message using Bob's `accountId`:
+Send a message from Alice to Bob:
 
 ```bash
 node src/cli.js send --state-dir ./state/alice --base-url http://127.0.0.1:8080 --to BOB_ACCOUNT_ID --text "hello"
 ```
 
-Sync Bob's inbox:
+Sync Bob's devices:
 
 ```bash
 node src/cli.js sync --state-dir ./state/bob --base-url http://127.0.0.1:8080
-node src/cli.js inbox --state-dir ./state/bob
+node src/cli.js sync --state-dir ./state/bob-laptop --base-url http://127.0.0.1:8080
 ```
 
-## Current Scope
+Sync Alice to receive delivery acknowledgements:
 
-This MVP supports:
+```bash
+node src/cli.js sync --state-dir ./state/alice --base-url http://127.0.0.1:8080
+node src/cli.js inbox --state-dir ./state/alice
+```
 
-- local device identity;
-- linked devices for the same account;
-- directory registration;
-- relay queue delivery with delivery ack;
-- signed and encrypted `1:1` envelopes for text payloads;
-- multi-device recipient fanout;
-- local event history on each device.
+`init` refuses to overwrite existing state unless `--force` is passed.
 
-This is still a prototype. It is not yet a production messenger:
+## Project Structure
 
-- there is no Double Ratchet implementation yet;
-- there is no MLS group engine yet;
-- there is no nearby transport implementation yet;
-- there are no mobile apps yet.
+```text
+src/
+  client/       local state, crypto boundary, workflow, HTTP API client
+  server/       directory and relay server
+  constants.js  protocol constants
+  envelope.js   transport-agnostic envelope model
+  policy.js     transport ranking policy
+  storage.js    relay/media replication helpers
+test/           protocol, crypto, and e2e tests
+docs/           protocol, architecture, security, roadmap, commercialization
+```
+
+## Portfolio Notes
+
+This repository is designed to show:
+
+- distributed systems thinking;
+- security boundary design;
+- server-light architecture;
+- testable protocol modeling;
+- product strategy around resilience and cost.
+
+## License
+
+MIT
