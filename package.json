@@ -1,0 +1,13 @@
+{
+  "name": "resilient-messenger-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference protocol starter for a resilient local-first messenger.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "server": "node src/cli.js server",
+    "demo:alice:init": "node src/cli.js init --state-dir ./state/alice --name Alice",
+    "demo:bob:init": "node src/cli.js init --state-dir ./state/bob --name Bob"
+  }
+}

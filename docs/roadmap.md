@@ -1,0 +1,71 @@
+# Product Roadmap
+
+## Stage 0: Current Starter
+
+Already implemented:
+
+- protocol v1 spec;
+- local device identity;
+- linked devices on the same account;
+- encrypted and signed `1:1` message envelopes;
+- file-backed directory and relay;
+- multi-device fanout and delivery acknowledgements;
+- local event history;
+- end-to-end tested send, sync, decrypt, and ack flow.
+
+## Stage 1: Usable Internal Alpha
+
+Build next:
+
+- Android client with local database;
+- background sync worker;
+- contact add flow by QR or invite code;
+- better queue retry and backoff;
+- message status transitions: queued, relayed, delivered, seen.
+
+Exit criteria:
+
+- two Android devices can exchange messages over the relay in unreliable network conditions.
+
+## Stage 2: Resilience Upgrade
+
+Build next:
+
+- multiple relay endpoints per user;
+- rotating inbox identifiers;
+- nearby sync transport;
+- attachment upload and chunk fetch;
+- bounded media escrow;
+- relay observability and queue pressure controls.
+
+Exit criteria:
+
+- system survives relay outages and reconnects after long offline windows.
+
+## Stage 3: Cryptographic Hardening
+
+Build next:
+
+- replace prototype envelope crypto with audited protocol components;
+- introduce Double Ratchet for `1:1`;
+- define group roadmap around MLS;
+- add device revocation and recovery flows;
+- perform independent security review.
+
+Exit criteria:
+
+- security boundary is documented well enough for outside audit.
+
+## Stage 4: Sale-Ready Package
+
+Build next:
+
+- hosted relay deployment guide;
+- white-label packaging;
+- server cost model per active user;
+- resilience benchmarks under packet loss and blocked endpoints;
+- demo build and buyer deck.
+
+Exit criteria:
+
+- product can be pitched either as a standalone tool or as licensable infrastructure.
