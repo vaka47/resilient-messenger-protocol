@@ -81,4 +81,6 @@ Expected result:
 - Bob laptop receives the same message through a separate envelope.
 - Alice's outbound event moves to `delivered` after both encrypted acks arrive.
 - Relay storage never contains plaintext message text.
+- Directory storage contains public prekeys only, not private key material.
+- First sends consume one-time prekeys from the directory.
 - Revoked devices are removed from future fanout and cannot pull old queued envelopes.

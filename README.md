@@ -15,6 +15,9 @@ The project explores a practical question: what should a messenger do when norma
 - Multi-device recipient fanout.
 - Delivery acknowledgements back to the sender.
 - Prototype per-device ratcheted message keys.
+- Signed prekey and one-time prekey bootstrap.
+- DH-ratchet turns for replies.
+- Skipped-message key cache for limited out-of-order delivery.
 - Device fingerprints for manual verification.
 - Device revocation enforcement.
 - Local append-only event history.
@@ -68,7 +71,9 @@ Implemented:
 - directory registration;
 - relay queue delivery with encrypted delivery ack;
 - signed and encrypted `1:1` envelopes;
-- prototype ratcheted message-key chains for text payloads;
+- signed prekey and one-time prekey directory bootstrap;
+- prototype DH-ratcheted message-key chains for text payloads;
+- skipped-message key handling for limited out-of-order delivery;
 - device fingerprint verification helpers;
 - revoked-device filtering and relay queue purge;
 - multi-device recipient fanout;
@@ -90,7 +95,7 @@ The relay server must never receive plaintext messages or private keys. In the c
 
 Important limitation: the current envelope crypto is a prototype layer built from standard Node.js primitives (`X25519`, `HKDF-SHA256`, `AES-256-GCM`, `Ed25519`). It demonstrates the end-to-end boundary but is not yet a full production E2EE messenger design.
 
-Message payloads now use a prototype per-device ratchet chain, so each message advances a chain key. This improves the security model compared with a static message envelope, but it is still not a full Signal Double Ratchet because it does not yet implement DH ratchet turns, skipped-message keys, prekeys, or post-compromise recovery.
+Message payloads now use a prototype per-device DH ratchet. It includes signed prekeys, one-time prekey consumption, chain-key advancement, DH-ratchet turns for replies, and skipped-message key handling. This improves the security model compared with a static message envelope, but it is still not a full Signal Double Ratchet because it does not yet implement X3DH/PQXDH exactly, full skipped-key lifecycle, hardened recovery, or independent cryptographic audit.
 
 For production, the plan is:
 

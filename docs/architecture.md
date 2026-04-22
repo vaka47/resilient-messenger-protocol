@@ -55,6 +55,8 @@ Directory service:
 - account records;
 - device descriptors;
 - public encryption and signing keys;
+- signed prekey bundles;
+- one-time prekey public bundles with consumption;
 - inbox identifiers.
 - device revocation state.
 

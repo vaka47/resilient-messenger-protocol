@@ -56,6 +56,13 @@ export function createProtocolServer({ store }) {
         return;
       }
 
+      if (request.method === "POST" && url.pathname === "/v1/directory/claim-prekey") {
+        const body = await readJsonBody(request);
+        const bundle = await store.claimPreKey(body);
+        sendJson(response, 200, { bundle });
+        return;
+      }
+
       if (request.method === "GET" && url.pathname.startsWith("/v1/directory/account/")) {
         const accountId = decodeURIComponent(url.pathname.split("/").at(-1));
         const account = store.lookupAccount(accountId);

@@ -9,6 +9,13 @@ export function createDirectApi(store) {
           inboxId: state.device.inboxId,
           dhPublicKeyPem: state.device.dhPublicKeyPem,
           signingPublicKeyPem: state.device.signingPublicKeyPem,
+          signedPreKeyId: state.device.signedPreKeyId,
+          signedPreKeyPublicPem: state.device.signedPreKeyPublicPem,
+          signedPreKeySignatureB64: state.device.signedPreKeySignatureB64,
+          oneTimePreKeys: (state.device.oneTimePreKeys || []).map((preKey) => ({
+            keyId: preKey.keyId,
+            publicKeyPem: preKey.publicKeyPem,
+          })),
         },
       });
 
@@ -23,6 +30,15 @@ export function createDirectApi(store) {
       }
 
       return { account };
+    },
+
+    async claimPreKey(_, accountId, deviceId) {
+      const bundle = await store.claimPreKey({
+        accountId,
+        deviceId,
+      });
+
+      return { bundle };
     },
 
     async revokeDevice(_, accountId, deviceId, revokedByDeviceId = null) {

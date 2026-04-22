@@ -11,10 +11,14 @@ Current envelope sealing uses standard Node.js cryptographic primitives:
 
 Current message payload delivery now additionally includes:
 
+- signed prekey bundles;
+- one-time prekey directory consumption;
 - per-device pairwise session derivation from X25519;
 - directional chain keys;
+- DH-ratchet turns when a peer replies with a new ratchet public key;
 - one message key per outbound message;
 - ratchet index enforcement to reject replay against advanced state;
+- skipped-message key cache for limited out-of-order delivery;
 - Ed25519 signatures over ratcheted payload bodies.
 
 This provides a useful prototype boundary:
@@ -23,6 +27,7 @@ This provides a useful prototype boundary:
 - tampering is detected;
 - sender authenticity can be checked against directory public keys;
 - basic replay against advanced state is rejected by message index checks.
+- server-side directory state does not contain device private keys.
 
 It is still not enough for production messaging.
 
@@ -43,7 +48,7 @@ Production chat encryption needs more than encrypting one payload:
 
 ### Phase 1: Session Bootstrap
 
-Implement an X3DH/PQXDH-style bootstrap:
+Replace the current X3DH-inspired bootstrap with a spec-faithful X3DH/PQXDH implementation:
 
 - identity key;
 - signed prekey;
@@ -52,7 +57,7 @@ Implement an X3DH/PQXDH-style bootstrap:
 
 ### Phase 2: `1:1` Ratcheting
 
-Replace the current symmetric ratchet prototype with full Double Ratchet state:
+Replace the current DH-ratchet prototype with full Double Ratchet state:
 
 - root key;
 - sending chain key;
@@ -60,6 +65,8 @@ Replace the current symmetric ratchet prototype with full Double Ratchet state:
 - per-message keys;
 - skipped-message key cache;
 - replay protection.
+- robust out-of-order delivery windows;
+- precise deletion lifecycle for skipped keys.
 
 ### Phase 3: Multi-Device Semantics
 

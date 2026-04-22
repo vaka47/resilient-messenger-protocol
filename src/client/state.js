@@ -2,23 +2,72 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { stableStringify } from "../util.js";
+
 function exportPem(keyObject, type) {
   return keyObject.export({ format: "pem", type }).toString();
+}
+
+function signSignedPreKey({ deviceId, signedPreKeyId, signedPreKeyPublicPem, signingPrivateKey }) {
+  return crypto
+    .sign(
+      null,
+      Buffer.from(
+        stableStringify({
+          deviceId,
+          signedPreKeyId,
+          signedPreKeyPublicPem,
+        }),
+        "utf8",
+      ),
+      signingPrivateKey,
+    )
+    .toString("base64");
+}
+
+function createOneTimePreKeys(count = 5) {
+  const keys = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync("x25519");
+    keys.push({
+      keyId: crypto.randomUUID(),
+      publicKeyPem: exportPem(publicKey, "spki"),
+      privateKeyPem: exportPem(privateKey, "pkcs8"),
+    });
+  }
+
+  return keys;
 }
 
 function createDeviceMaterial() {
   const { publicKey: dhPublicKey, privateKey: dhPrivateKey } = crypto.generateKeyPairSync("x25519");
   const { publicKey: signingPublicKey, privateKey: signingPrivateKey } =
     crypto.generateKeyPairSync("ed25519");
+  const { publicKey: signedPreKeyPublicKey, privateKey: signedPreKeyPrivateKey } =
+    crypto.generateKeyPairSync("x25519");
+  const deviceId = crypto.randomUUID();
+  const signedPreKeyId = crypto.randomUUID();
+  const signedPreKeyPublicPem = exportPem(signedPreKeyPublicKey, "spki");
 
   return {
-    deviceId: crypto.randomUUID(),
+    deviceId,
     inboxId: crypto.randomUUID(),
     registeredAt: null,
     dhPublicKeyPem: exportPem(dhPublicKey, "spki"),
     dhPrivateKeyPem: exportPem(dhPrivateKey, "pkcs8"),
     signingPublicKeyPem: exportPem(signingPublicKey, "spki"),
     signingPrivateKeyPem: exportPem(signingPrivateKey, "pkcs8"),
+    signedPreKeyId,
+    signedPreKeyPublicPem,
+    signedPreKeyPrivatePem: exportPem(signedPreKeyPrivateKey, "pkcs8"),
+    signedPreKeySignatureB64: signSignedPreKey({
+      deviceId,
+      signedPreKeyId,
+      signedPreKeyPublicPem,
+      signingPrivateKey,
+    }),
+    oneTimePreKeys: createOneTimePreKeys(),
   };
 }
 

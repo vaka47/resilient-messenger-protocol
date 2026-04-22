@@ -42,12 +42,37 @@ Evidence:
 
 Claim:
 
-- prototype message chains advance after each message.
+- prototype message chains advance after each message and can perform DH-ratchet turns on replies.
 
 Evidence:
 
 - `test/ratchet.test.js` checks send/receive index advancement;
 - replay against an advanced receive chain is rejected.
+- `test/ratchet.test.js` checks out-of-order skipped-key handling.
+- `test/ratchet.test.js` checks a reply path that changes the root key through a DH-ratchet turn.
+
+### Prekey bootstrap
+
+Claim:
+
+- new sessions use signed prekey bundles and consume one-time prekeys from the directory.
+
+Evidence:
+
+- `src/client/state.js` creates signed prekeys and one-time prekeys.
+- `src/server/state-store.js` exposes `claimPreKey` and consumes one-time prekeys.
+- `test/e2e.test.js` checks that one-time prekeys are consumed after first send.
+
+### Private key locality
+
+Claim:
+
+- device private keys and prekey private material are not registered with the directory.
+
+Evidence:
+
+- `src/client/api.js` publishes only public prekey material.
+- `test/e2e.test.js` checks that server state does not contain private key fields after registration.
 
 ### Device verification
 
@@ -75,9 +100,9 @@ Evidence:
 The following are not production-ready and should be treated as open audit items:
 
 - full X3DH/PQXDH prekey protocol;
-- full Double Ratchet with DH ratchet turns;
-- skipped-message key handling;
-- out-of-order message delivery;
+- spec-faithful Double Ratchet with audited state lifecycle;
+- hardened skipped-message key lifecycle;
+- large-window out-of-order message delivery;
 - MLS group encryption;
 - key transparency;
 - secure backup and recovery;

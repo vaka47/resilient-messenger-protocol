@@ -4,12 +4,15 @@ import { PAYLOAD_TYPE, PRIORITY, createEnvelope } from "../index.js";
 import { appendEvent, applyDeliveryAck, mergeDirectoryRecord, upsertSession } from "./state.js";
 import { deriveConversationId, openPayload, sealPayload } from "./crypto.js";
 import {
+  getSessionKey,
   getOrCreatePairwiseSession,
   openWithSession,
+  readRatchetedHeader,
   sealAndSignWithSession,
 } from "./ratchet.js";
 import {
   ackEnvelope,
+  claimPreKey,
   enqueueEnvelope,
   lookupAccount,
   pullQueue,
@@ -91,6 +94,7 @@ export async function sendTextMessage({
   text,
   priority = PRIORITY.NORMAL,
   api = {
+    claimPreKey,
     lookupAccount,
     enqueueEnvelope,
   },
@@ -113,10 +117,29 @@ export async function sendTextMessage({
       recipientInboxIds: [recipientDevice.inboxId],
     };
 
+    const sessionKey = getSessionKey(state.device.deviceId, recipientDevice.deviceId);
+    let remotePreKeyBundle = null;
+    let sessionRemoteDevice = recipientDevice;
+
+    if (!workingState.sessions?.[sessionKey] && api.claimPreKey) {
+      const claim = await api.claimPreKey(
+        baseUrl,
+        recipient.account.accountId,
+        recipientDevice.deviceId,
+      );
+      remotePreKeyBundle = claim.bundle;
+      sessionRemoteDevice = {
+        ...recipientDevice,
+        ...claim.bundle.device,
+      };
+    }
+
     const sessionResult = getOrCreatePairwiseSession({
       state: workingState,
       remoteAccountId: recipient.account.accountId,
-      remoteDevice: recipientDevice,
+      remoteDevice: sessionRemoteDevice,
+      role: "initiator",
+      remotePreKeyBundle,
     });
     workingState = sessionResult.state;
 
@@ -214,10 +237,13 @@ export async function syncInboxWithApi({
     let payload;
 
     if (item.envelope.payloadType === PAYLOAD_TYPE.MESSAGE) {
+      const inboundHeader = readRatchetedHeader(item.envelope.ciphertext);
       const sessionResult = getOrCreatePairwiseSession({
         state: nextState,
         remoteAccountId: senderLookup.account.accountId,
         remoteDevice: senderDevice,
+        role: "responder",
+        inboundHeader,
       });
       nextState = sessionResult.state;
 

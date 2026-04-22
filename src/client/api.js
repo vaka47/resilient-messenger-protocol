@@ -22,6 +22,13 @@ export async function registerDevice(baseUrl, state) {
         inboxId: state.device.inboxId,
         dhPublicKeyPem: state.device.dhPublicKeyPem,
         signingPublicKeyPem: state.device.signingPublicKeyPem,
+        signedPreKeyId: state.device.signedPreKeyId,
+        signedPreKeyPublicPem: state.device.signedPreKeyPublicPem,
+        signedPreKeySignatureB64: state.device.signedPreKeySignatureB64,
+        oneTimePreKeys: (state.device.oneTimePreKeys || []).map((preKey) => ({
+          keyId: preKey.keyId,
+          publicKeyPem: preKey.publicKeyPem,
+        })),
       },
     }),
   });
@@ -31,6 +38,21 @@ export async function registerDevice(baseUrl, state) {
 
 export async function lookupAccount(baseUrl, accountId) {
   const response = await fetch(`${baseUrl}/v1/directory/account/${accountId}`);
+  return parseJsonResponse(response);
+}
+
+export async function claimPreKey(baseUrl, accountId, deviceId) {
+  const response = await fetch(`${baseUrl}/v1/directory/claim-prekey`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      accountId,
+      deviceId,
+    }),
+  });
+
   return parseJsonResponse(response);
 }
 

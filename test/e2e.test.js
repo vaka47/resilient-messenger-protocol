@@ -61,6 +61,10 @@ test("end-to-end send fans out to multiple devices and returns delivery acks", a
   await saveLocalState(bobPhoneDir, bobPhone);
   await saveLocalState(bobLaptopDir, bobLaptop);
 
+  const serverSnapshotAfterRegister = await fs.readFile(dataFile, "utf8");
+  assert.equal(serverSnapshotAfterRegister.includes("PrivateKeyPem"), false);
+  assert.equal(serverSnapshotAfterRegister.includes("privateKeyPem"), false);
+
   const sendResult = await sendTextMessage({
     baseUrl: "memory://protocol",
     state: alice,
@@ -71,6 +75,17 @@ test("end-to-end send fans out to multiple devices and returns delivery acks", a
 
   alice = sendResult.state;
   await saveLocalState(aliceDir, alice);
+
+  assert.equal(
+    store.state.directory.accounts[bobPhone.account.accountId].devices[bobPhone.device.deviceId]
+      .oneTimePreKeys.length,
+    4,
+  );
+  assert.equal(
+    store.state.directory.accounts[bobLaptop.account.accountId].devices[bobLaptop.device.deviceId]
+      .oneTimePreKeys.length,
+    4,
+  );
 
   const relaySnapshotAfterSend = await fs.readFile(dataFile, "utf8");
   assert.equal(relaySnapshotAfterSend.includes("resilient hello"), false);

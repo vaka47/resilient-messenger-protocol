@@ -104,6 +104,40 @@ export class FileBackedStateStore {
     return account;
   }
 
+  async claimPreKey({ accountId, deviceId }) {
+    const account = this.state.directory.accounts[accountId];
+    const device = account?.devices?.[deviceId];
+
+    if (!device) {
+      throw new Error(`Device ${deviceId} for account ${accountId} not found`);
+    }
+
+    if (device.revokedAt) {
+      throw new Error(`Device ${deviceId} has been revoked`);
+    }
+
+    const oneTimePreKey = (device.oneTimePreKeys || []).shift() || null;
+    await this.persist();
+
+    return {
+      accountId,
+      deviceId,
+      device: {
+        deviceId: device.deviceId,
+        inboxId: device.inboxId,
+        dhPublicKeyPem: device.dhPublicKeyPem,
+        signingPublicKeyPem: device.signingPublicKeyPem,
+        signedPreKeyId: device.signedPreKeyId,
+        signedPreKeyPublicPem: device.signedPreKeyPublicPem,
+        signedPreKeySignatureB64: device.signedPreKeySignatureB64,
+      },
+      signedPreKeyId: device.signedPreKeyId,
+      signedPreKeyPublicPem: device.signedPreKeyPublicPem,
+      signedPreKeySignatureB64: device.signedPreKeySignatureB64,
+      oneTimePreKey,
+    };
+  }
+
   async enqueueEnvelope({ envelope, recipientInboxId }) {
     const recipient = this.findDeviceByInbox(recipientInboxId);
 
