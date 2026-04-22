@@ -20,6 +20,7 @@ flowchart TB
 
   Directory["Directory service\npublic keys, device ids, inbox ids"]
   Relay["Relay service\ntemporary encrypted queues"]
+  Transparency["Transparency log\ndevice lifecycle hash chain"]
   LocalLogs["Local event logs\nsource of durable history"]
 
   A1 -->|"register device"| Directory
@@ -34,6 +35,7 @@ flowchart TB
   B2 -->|"encrypted ack"| Relay
   Relay -->|"ack envelopes"| A1
   Directory -. "revocation state" .-> Relay
+  Directory -->|"registration, revocation entries"| Transparency
 
   A1 --> LocalLogs
   B1 --> LocalLogs
@@ -58,7 +60,8 @@ Directory service:
 - signed prekey bundles;
 - one-time prekey public bundles with consumption;
 - inbox identifiers.
-- device revocation state.
+- device revocation state;
+- key transparency entries for registration and revocation.
 
 Relay service:
 
@@ -72,6 +75,7 @@ The server must not store:
 - plaintext messages;
 - private keys;
 - permanent chat history.
+- private recovery passphrases or unencrypted recovery bundles.
 
 ## Scaling Model
 
@@ -81,5 +85,6 @@ Durable storage lives mostly on devices. Server cost is dominated by:
 - temporary queue storage;
 - short-lived delivery traffic;
 - optional future media escrow.
+- append-only transparency metadata.
 
 This is the core infrastructure advantage over a cloud-history messenger.

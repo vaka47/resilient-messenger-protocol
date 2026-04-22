@@ -19,7 +19,7 @@ Groups cannot safely reuse naive pairwise fanout forever because large groups ne
 
 ## Intended Production Direction
 
-Use an MLS-style design:
+Use an MLS-style design aligned with RFC 9420:
 
 - group id;
 - member credentials;
@@ -27,6 +27,12 @@ Use an MLS-style design:
 - commit messages for add/remove/update;
 - per-epoch application secret;
 - encrypted application messages bound to epoch and sender.
+
+Implementation requirement:
+
+- do not emulate MLS by encrypting one group key manually;
+- use a reviewed MLS implementation or build against RFC 9420 test vectors;
+- bind membership changes to the key transparency and device revocation model.
 
 ## Prototype Boundary
 

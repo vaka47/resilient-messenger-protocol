@@ -11,6 +11,8 @@ Already implemented:
 - prototype per-device DH-ratcheted message chains;
 - signed prekey and one-time prekey bootstrap;
 - skipped-message key cache;
+- append-only key transparency hash-chain prototype;
+- encrypted local recovery bundle prototype;
 - file-backed directory and relay;
 - multi-device fanout and delivery acknowledgements;
 - device fingerprints and revocation enforcement;
@@ -52,8 +54,9 @@ Build next:
 
 - replace prototype envelope crypto with audited protocol components;
 - replace DH-ratchet prototype with spec-faithful Double Ratchet for `1:1`;
-- define group roadmap around MLS;
-- add recovery flows, transparency, and audited revocation UX;
+- replace X3DH-inspired bootstrap with spec-faithful X3DH/PQXDH;
+- define group implementation around MLS;
+- harden recovery flows, transparency, and audited revocation UX;
 - perform independent security review.
 
 Exit criteria:

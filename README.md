@@ -18,6 +18,8 @@ The project explores a practical question: what should a messenger do when norma
 - Signed prekey and one-time prekey bootstrap.
 - DH-ratchet turns for replies.
 - Skipped-message key cache for limited out-of-order delivery.
+- Verifiable append-only key transparency log for device lifecycle changes.
+- Encrypted local recovery bundle for account/device key material.
 - Device fingerprints for manual verification.
 - Device revocation enforcement.
 - Local append-only event history.
@@ -55,6 +57,7 @@ Detailed docs:
 - [Security model](docs/security-model.md)
 - [Crypto roadmap](docs/crypto-roadmap.md)
 - [Group security boundary](docs/group-security.md)
+- [Production readiness](docs/production-readiness.md)
 - [Audit readiness](docs/audit-readiness.md)
 - [Demo script](docs/demo.md)
 - [Roadmap](docs/roadmap.md)
@@ -74,6 +77,8 @@ Implemented:
 - signed prekey and one-time prekey directory bootstrap;
 - prototype DH-ratcheted message-key chains for text payloads;
 - skipped-message key handling for limited out-of-order delivery;
+- append-only key transparency log for registration and revocation events;
+- encrypted recovery bundle export/restore for local device key material;
 - device fingerprint verification helpers;
 - revoked-device filtering and relay queue purge;
 - multi-device recipient fanout;
@@ -87,7 +92,7 @@ Not implemented yet:
 - nearby Bluetooth/Wi-Fi transport;
 - Android/iOS client;
 - push notifications;
-- device recovery and revocation UX.
+- hardened device recovery and revocation UX.
 
 ## Security Position
 
@@ -95,7 +100,7 @@ The relay server must never receive plaintext messages or private keys. In the c
 
 Important limitation: the current envelope crypto is a prototype layer built from standard Node.js primitives (`X25519`, `HKDF-SHA256`, `AES-256-GCM`, `Ed25519`). It demonstrates the end-to-end boundary but is not yet a full production E2EE messenger design.
 
-Message payloads now use a prototype per-device DH ratchet. It includes signed prekeys, one-time prekey consumption, chain-key advancement, DH-ratchet turns for replies, and skipped-message key handling. This improves the security model compared with a static message envelope, but it is still not a full Signal Double Ratchet because it does not yet implement X3DH/PQXDH exactly, full skipped-key lifecycle, hardened recovery, or independent cryptographic audit.
+Message payloads now use a prototype per-device DH ratchet. It includes signed prekeys, one-time prekey consumption, chain-key advancement, DH-ratchet turns for replies, and skipped-message key handling. Device lifecycle changes are recorded in a verifiable hash-chain transparency log, and local key recovery is encrypted client-side. This improves the security model compared with a static message envelope, but it is still not a full production E2EE stack because it does not yet implement X3DH/PQXDH exactly, the full Double Ratchet lifecycle, MLS, hardened recovery, or independent cryptographic audit.
 
 For production, the plan is:
 
@@ -103,6 +108,7 @@ For production, the plan is:
 - `groups`: MLS-style group state.
 - `post-compromise recovery`: ratcheted message keys.
 - `metadata minimization`: rotating inbox ids and bounded relay retention.
+- `trust visibility`: key transparency with client monitoring and consistency proofs.
 
 See [Security model](docs/security-model.md) and [Crypto roadmap](docs/crypto-roadmap.md).
 
@@ -179,14 +185,27 @@ Revoke a linked device:
 node src/cli.js revoke-device --state-dir ./state/bob --base-url http://127.0.0.1:8080 --device-id BOB_LAPTOP_DEVICE_ID
 ```
 
+Inspect the key transparency log:
+
+```bash
+node src/cli.js transparency --base-url http://127.0.0.1:8080
+```
+
+Export and restore an encrypted recovery bundle:
+
+```bash
+node src/cli.js recovery-export --state-dir ./state/alice --out ./state/alice.recovery.json --passphrase "correct horse battery staple"
+node src/cli.js recovery-restore --bundle ./state/alice.recovery.json --state-dir ./state/alice-restored --passphrase "correct horse battery staple"
+```
+
 `init` refuses to overwrite existing state unless `--force` is passed.
 
 ## Project Structure
 
 ```text
 src/
-  client/       local state, crypto, ratchet, identity, workflow, HTTP API client
-  server/       directory and relay server
+  client/       local state, crypto, ratchet, recovery, identity, workflow, HTTP API client
+  server/       directory, relay, and transparency log server
   constants.js  protocol constants
   envelope.js   transport-agnostic envelope model
   policy.js     transport ranking policy

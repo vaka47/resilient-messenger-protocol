@@ -113,3 +113,8 @@ export async function fetchStats(baseUrl) {
   const response = await fetch(`${baseUrl}/v1/stats`);
   return parseJsonResponse(response);
 }
+
+export async function fetchTransparencyLog(baseUrl) {
+  const response = await fetch(`${baseUrl}/v1/transparency`);
+  return parseJsonResponse(response);
+}

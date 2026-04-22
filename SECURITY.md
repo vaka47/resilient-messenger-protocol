@@ -14,4 +14,4 @@ Open a private report through GitHub security advisories if available, or contac
 
 ## Important Disclaimer
 
-The current implementation demonstrates server-blind encrypted delivery, but it does not yet implement production Double Ratchet, MLS, key transparency, device revocation, or audited recovery flows.
+The current implementation demonstrates server-blind encrypted delivery, device revocation, a prototype DH ratchet, a key transparency hash chain, and encrypted recovery bundles. It does not yet implement spec-faithful production Double Ratchet, PQXDH, MLS, production key transparency, or audited recovery flows.

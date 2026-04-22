@@ -72,5 +72,9 @@ export function createDirectApi(store) {
     async fetchStats() {
       return store.getStats();
     },
+
+    async fetchTransparencyLog() {
+      return store.getTransparencyLog();
+    },
   };
 }

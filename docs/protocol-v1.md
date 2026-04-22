@@ -59,6 +59,7 @@ These are the areas of differentiation:
 - user-device-first replication;
 - nearby and delay-tolerant sync;
 - metadata-minimizing addressing and rotating inbox identifiers.
+- verifiable device lifecycle transparency.
 
 ## 4. Logical Layers
 
@@ -205,6 +206,12 @@ Stores:
 
 This service should be tiny and strongly verifiable.
 
+Current prototype:
+
+- publishes only public device and prekey material;
+- consumes one-time prekeys during session bootstrap;
+- appends registration and revocation events to a verifiable hash-chain transparency log.
+
 ### 8.2 Relay service
 
 Stores:
@@ -224,6 +231,18 @@ Used only to wake clients where OS restrictions require it.
 ### 8.4 Escrow storage
 
 Optional service for media or delayed handoff when no peer path exists.
+
+### 8.5 Recovery bundle
+
+Recovery is client-owned, not server plaintext escrow.
+
+Current prototype:
+
+- exports account/device key material only after encrypting it locally;
+- derives an AES-256-GCM key from a passphrase with scrypt;
+- restores into a fresh local state without restoring prior sessions or event history.
+
+Production recovery must add hardware-backed storage, rate limiting or secret sharing, and clear UX for stolen or cloned devices.
 
 ## 9. Message Lifecycle
 

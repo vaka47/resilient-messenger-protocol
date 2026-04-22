@@ -7,6 +7,8 @@ This script demonstrates the current protocol flow:
 - Relay stores ciphertext only.
 - Both Bob devices decrypt locally.
 - Alice receives encrypted delivery acknowledgements.
+- Device lifecycle changes appear in the transparency log.
+- Alice can export an encrypted local recovery bundle.
 
 ## Commands
 
@@ -75,6 +77,18 @@ Revoke Bob laptop:
 node src/cli.js revoke-device --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --device-id BOB_LAPTOP_DEVICE_ID
 ```
 
+Inspect key transparency:
+
+```bash
+node src/cli.js transparency --base-url http://127.0.0.1:8080
+```
+
+Export a local recovery bundle:
+
+```bash
+node src/cli.js recovery-export --state-dir ./state/alice --out ./state/alice.recovery.json --passphrase "correct horse battery staple"
+```
+
 Expected result:
 
 - Bob phone receives the message.
@@ -84,3 +98,5 @@ Expected result:
 - Directory storage contains public prekeys only, not private key material.
 - First sends consume one-time prekeys from the directory.
 - Revoked devices are removed from future fanout and cannot pull old queued envelopes.
+- Transparency verification returns `valid: true`.
+- Recovery output does not contain plaintext private key PEM fields.

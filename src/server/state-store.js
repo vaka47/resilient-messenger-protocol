@@ -2,6 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { buildRelayQueueItem } from "../index.js";
+import {
+  TRANSPARENCY_PROFILE,
+  createTransparencyEntry,
+  verifyTransparencyLog,
+} from "./transparency.js";
 
 function createInitialState() {
   return {
@@ -11,6 +16,41 @@ function createInitialState() {
     relay: {
       queues: {},
     },
+    transparency: {
+      entries: [],
+    },
+  };
+}
+
+function normalizeStateShape(state) {
+  return {
+    ...createInitialState(),
+    ...state,
+    directory: {
+      ...createInitialState().directory,
+      ...(state.directory || {}),
+    },
+    relay: {
+      ...createInitialState().relay,
+      ...(state.relay || {}),
+    },
+    transparency: {
+      ...createInitialState().transparency,
+      ...(state.transparency || {}),
+    },
+  };
+}
+
+function publicDeviceSnapshot(device) {
+  return {
+    deviceId: device.deviceId,
+    inboxId: device.inboxId,
+    dhPublicKeyPem: device.dhPublicKeyPem,
+    signingPublicKeyPem: device.signingPublicKeyPem,
+    signedPreKeyId: device.signedPreKeyId,
+    signedPreKeyPublicPem: device.signedPreKeyPublicPem,
+    signedPreKeySignatureB64: device.signedPreKeySignatureB64,
+    oneTimePreKeyIds: (device.oneTimePreKeys || []).map((preKey) => preKey.keyId),
   };
 }
 
@@ -25,7 +65,7 @@ export class FileBackedStateStore {
 
     try {
       const existing = await fs.readFile(this.filePath, "utf8");
-      this.state = JSON.parse(existing);
+      this.state = normalizeStateShape(JSON.parse(existing));
     } catch (error) {
       if (error.code !== "ENOENT") {
         throw error;
@@ -64,6 +104,16 @@ export class FileBackedStateStore {
     }
 
     this.state.directory.accounts[accountId] = existing;
+    this.appendTransparencyEntry({
+      type: "device.registered",
+      accountId,
+      deviceId: device.deviceId,
+      payload: {
+        accountId,
+        displayName,
+        device: publicDeviceSnapshot(existing.devices[device.deviceId]),
+      },
+    });
     await this.persist();
     return existing;
   }
@@ -100,6 +150,17 @@ export class FileBackedStateStore {
       revokedByDeviceId,
     };
 
+    this.appendTransparencyEntry({
+      type: "device.revoked",
+      accountId,
+      deviceId,
+      payload: {
+        accountId,
+        deviceId,
+        revokedAt: account.devices[deviceId].revokedAt,
+        revokedByDeviceId,
+      },
+    });
     await this.persist();
     return account;
   }
@@ -199,6 +260,35 @@ export class FileBackedStateStore {
       accountCount,
       queuedItems,
       inboxCount: Object.keys(this.state.relay.queues).length,
+      transparencyEntryCount: this.state.transparency?.entries?.length || 0,
+    };
+  }
+
+  appendTransparencyEntry({ type, accountId, deviceId, payload }) {
+    const entries = this.state.transparency?.entries || [];
+    const entry = createTransparencyEntry({
+      entries,
+      type,
+      accountId,
+      deviceId,
+      payload,
+    });
+
+    this.state.transparency = {
+      profile: TRANSPARENCY_PROFILE,
+      entries: [...entries, entry],
+    };
+
+    return entry;
+  }
+
+  getTransparencyLog() {
+    const entries = this.state.transparency?.entries || [];
+
+    return {
+      profile: TRANSPARENCY_PROFILE,
+      entries,
+      verification: verifyTransparencyLog(entries),
     };
   }
 }

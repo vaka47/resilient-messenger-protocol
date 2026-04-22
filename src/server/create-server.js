@@ -108,6 +108,11 @@ export function createProtocolServer({ store }) {
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/v1/transparency") {
+        sendJson(response, 200, store.getTransparencyLog());
+        return;
+      }
+
       notFound(response);
     } catch (error) {
       sendJson(response, 500, {

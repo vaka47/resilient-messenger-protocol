@@ -15,6 +15,8 @@ Current prototype invariant:
 - signed prekeys and one-time prekeys bootstrap new sessions;
 - prekey private material stays local and is not registered with the directory;
 - skipped-message keys support limited out-of-order delivery;
+- registration and revocation are written to an append-only key transparency hash chain;
+- recovery bundles encrypt local account/device key material before export;
 - device fingerprints can be verified by users;
 - revoked devices are filtered from future fanout and cannot pull their old relay queue.
 
@@ -34,9 +36,9 @@ This repository is not yet production E2EE. Missing pieces:
 - no audited full Signal-compatible Double Ratchet implementation;
 - no hardened post-compromise recovery after device-key theft;
 - no MLS group encryption;
-- no key transparency or safety-number UX;
-- no hardened production revocation UX or transparency log;
-- no secure backup/recovery flow;
+- no production key transparency service with consistency proofs, monitoring, and gossip;
+- no hardened production revocation UX;
+- no hardware-backed or rate-limited secure backup/recovery flow;
 - no push notification privacy design;
 - no audited implementation.
 
@@ -67,6 +69,8 @@ For production, the protocol should adopt well-reviewed building blocks:
 - X3DH/PQXDH-style asynchronous session setup;
 - Double Ratchet for `1:1` message secrecy, forward secrecy, and post-compromise recovery;
 - MLS for groups;
+- key transparency for device-key lifecycle visibility;
+- secure recovery with hardware-backed local storage and audited backup unlock;
 - AEAD and HKDF from mature cryptographic libraries;
 - independent security audit before claiming production security.
 
@@ -74,10 +78,10 @@ For production, the protocol should adopt well-reviewed building blocks:
 
 Safe claim for this repo:
 
-> This prototype demonstrates a server-blind message delivery boundary.
+> This prototype demonstrates a server-blind message delivery boundary, per-device key advancement, and auditable device lifecycle logging.
 
 Unsafe claim for this repo:
 
 > This is production-grade secure messaging.
 
-That claim requires ratcheting sessions, group key management, device recovery, revocation, transparency, and audit.
+That claim requires spec-faithful ratcheting sessions, group key management, hardened device recovery, production transparency, and external audit.

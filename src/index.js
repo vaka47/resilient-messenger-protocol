@@ -5,3 +5,5 @@ export * from "./storage.js";
 export * from "./util.js";
 export * from "./client/identity.js";
 export * from "./client/ratchet.js";
+export * from "./client/recovery.js";
+export * from "./server/transparency.js";

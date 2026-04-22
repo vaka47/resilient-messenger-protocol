@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
+import fs from "node:fs/promises";
 import path from "node:path";
 
-import { fetchStats, revokeDevice } from "./client/api.js";
+import { fetchStats, fetchTransparencyLog, revokeDevice } from "./client/api.js";
 import { computeDeviceFingerprint, verifyDeviceFingerprint } from "./client/identity.js";
+import { createRecoveryBundle, openRecoveryBundle } from "./client/recovery.js";
 import { registerState, sendTextMessage, syncInbox } from "./client/workflow.js";
 import {
+  getStateFilePath,
   initLocalState,
   linkLocalDevice,
   loadLocalState,
@@ -31,7 +34,27 @@ function printHelp() {
   sync --state-dir ./state/bob --base-url http://127.0.0.1:8080
   inbox --state-dir ./state/bob
   stats --base-url http://127.0.0.1:8080
+  transparency --base-url http://127.0.0.1:8080
+  recovery-export --state-dir ./state/alice --out ./alice.recovery.json --passphrase "long passphrase"
+  recovery-restore --bundle ./alice.recovery.json --state-dir ./state/alice-restored --passphrase "long passphrase" [--force]
 `);
+}
+
+async function ensureRestoreTarget(stateDir, force) {
+  await fs.mkdir(stateDir, { recursive: true });
+
+  if (force) {
+    return;
+  }
+
+  try {
+    await fs.access(getStateFilePath(stateDir));
+    throw new Error(`State already exists at ${stateDir}; rerun with --force if replacement is intended`);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
+  }
 }
 
 async function main() {
@@ -218,6 +241,59 @@ async function main() {
     const baseUrl = requireFlag(flags, "base-url");
     const stats = await fetchStats(baseUrl);
     printJson(stats);
+    return;
+  }
+
+  if (command === "transparency") {
+    const baseUrl = requireFlag(flags, "base-url");
+    const log = await fetchTransparencyLog(baseUrl);
+    printJson(log);
+    return;
+  }
+
+  if (command === "recovery-export") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const outFile = path.resolve(requireFlag(flags, "out"));
+    const passphrase = requireFlag(flags, "passphrase");
+    const state = await loadLocalState(stateDir);
+    const bundle = createRecoveryBundle({
+      state,
+      passphrase,
+    });
+
+    await fs.mkdir(path.dirname(outFile), { recursive: true });
+    await fs.writeFile(outFile, `${JSON.stringify(bundle, null, 2)}\n`, "utf8");
+    printJson({
+      outFile,
+      accountId: bundle.accountId,
+      deviceId: bundle.deviceId,
+      profile: bundle.profile,
+    });
+    return;
+  }
+
+  if (command === "recovery-restore") {
+    const bundleFile = path.resolve(requireFlag(flags, "bundle"));
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const passphrase = requireFlag(flags, "passphrase");
+    const bundle = JSON.parse(await fs.readFile(bundleFile, "utf8"));
+    const state = openRecoveryBundle({
+      bundle,
+      passphrase,
+    });
+
+    await ensureRestoreTarget(stateDir, Boolean(flags.force));
+    await saveLocalState(stateDir, {
+      ...state,
+      sessions: {},
+      events: [],
+    });
+    printJson({
+      stateDir,
+      accountId: state.account.accountId,
+      deviceId: state.device.deviceId,
+      restored: true,
+    });
     return;
   }
 
