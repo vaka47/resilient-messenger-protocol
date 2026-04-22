@@ -14,6 +14,9 @@ The project explores a practical question: what should a messenger do when norma
 - Local device identity with linked devices.
 - Multi-device recipient fanout.
 - Delivery acknowledgements back to the sender.
+- Prototype per-device ratcheted message keys.
+- Device fingerprints for manual verification.
+- Device revocation enforcement.
 - Local append-only event history.
 - CLI demo and end-to-end tests.
 - Explicit security model and production crypto roadmap.
@@ -39,6 +42,7 @@ flowchart LR
   Relay -->|"acks"| Alice
   Directory["Directory service"] -. "device public keys, inbox ids" .-> Alice
   Directory -. "device public keys, inbox ids" .-> BobPhone
+  Directory -. "revocation state" .-> Relay
 ```
 
 Detailed docs:
@@ -47,6 +51,8 @@ Detailed docs:
 - [Architecture](docs/architecture.md)
 - [Security model](docs/security-model.md)
 - [Crypto roadmap](docs/crypto-roadmap.md)
+- [Group security boundary](docs/group-security.md)
+- [Audit readiness](docs/audit-readiness.md)
 - [Demo script](docs/demo.md)
 - [Roadmap](docs/roadmap.md)
 - [Commercialization paths](docs/commercialization.md)
@@ -61,7 +67,10 @@ Implemented:
 - linked devices for one account;
 - directory registration;
 - relay queue delivery with encrypted delivery ack;
-- signed and encrypted `1:1` envelopes for text payloads;
+- signed and encrypted `1:1` envelopes;
+- prototype ratcheted message-key chains for text payloads;
+- device fingerprint verification helpers;
+- revoked-device filtering and relay queue purge;
 - multi-device recipient fanout;
 - local event history on each device;
 - end-to-end tests for send, receive, decrypt, ack, and status update.
@@ -80,6 +89,8 @@ Not implemented yet:
 The relay server must never receive plaintext messages or private keys. In the current prototype, message content is sealed on the sender device and can only be opened with the recipient device private key.
 
 Important limitation: the current envelope crypto is a prototype layer built from standard Node.js primitives (`X25519`, `HKDF-SHA256`, `AES-256-GCM`, `Ed25519`). It demonstrates the end-to-end boundary but is not yet a full production E2EE messenger design.
+
+Message payloads now use a prototype per-device ratchet chain, so each message advances a chain key. This improves the security model compared with a static message envelope, but it is still not a full Signal Double Ratchet because it does not yet implement DH ratchet turns, skipped-message keys, prekeys, or post-compromise recovery.
 
 For production, the plan is:
 
@@ -145,13 +156,31 @@ node src/cli.js sync --state-dir ./state/alice --base-url http://127.0.0.1:8080
 node src/cli.js inbox --state-dir ./state/alice
 ```
 
+Show a cached device fingerprint:
+
+```bash
+node src/cli.js fingerprint --state-dir ./state/alice --account-id BOB_ACCOUNT_ID --device-id BOB_DEVICE_ID
+```
+
+Verify the device after comparing the fingerprint out-of-band:
+
+```bash
+node src/cli.js verify-device --state-dir ./state/alice --account-id BOB_ACCOUNT_ID --device-id BOB_DEVICE_ID --fingerprint "FINGERPRINT"
+```
+
+Revoke a linked device:
+
+```bash
+node src/cli.js revoke-device --state-dir ./state/bob --base-url http://127.0.0.1:8080 --device-id BOB_LAPTOP_DEVICE_ID
+```
+
 `init` refuses to overwrite existing state unless `--force` is passed.
 
 ## Project Structure
 
 ```text
 src/
-  client/       local state, crypto boundary, workflow, HTTP API client
+  client/       local state, crypto, ratchet, identity, workflow, HTTP API client
   server/       directory and relay server
   constants.js  protocol constants
   envelope.js   transport-agnostic envelope model

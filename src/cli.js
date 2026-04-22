@@ -2,7 +2,8 @@
 
 import path from "node:path";
 
-import { fetchStats } from "./client/api.js";
+import { fetchStats, revokeDevice } from "./client/api.js";
+import { computeDeviceFingerprint, verifyDeviceFingerprint } from "./client/identity.js";
 import { registerState, sendTextMessage, syncInbox } from "./client/workflow.js";
 import {
   initLocalState,
@@ -23,6 +24,9 @@ function printHelp() {
   init --state-dir ./state/alice --name Alice [--force]
   link-device --from-state-dir ./state/bob-phone --state-dir ./state/bob-laptop [--force]
   register --state-dir ./state/alice --base-url http://127.0.0.1:8080
+  fingerprint --state-dir ./state/alice --account-id ACCOUNT_ID --device-id DEVICE_ID
+  verify-device --state-dir ./state/alice --account-id ACCOUNT_ID --device-id DEVICE_ID --fingerprint FINGERPRINT
+  revoke-device --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --device-id DEVICE_ID
   send --state-dir ./state/alice --base-url http://127.0.0.1:8080 --to ACCOUNT_ID --text "hello"
   sync --state-dir ./state/bob --base-url http://127.0.0.1:8080
   inbox --state-dir ./state/bob
@@ -94,6 +98,70 @@ async function main() {
       accountId: state.account.accountId,
       deviceId: state.device.deviceId,
       inboxId: state.device.inboxId,
+    });
+    return;
+  }
+
+  if (command === "revoke-device") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const baseUrl = requireFlag(flags, "base-url");
+    const deviceId = requireFlag(flags, "device-id");
+    const state = await loadLocalState(stateDir);
+    const result = await revokeDevice(
+      baseUrl,
+      state.account.accountId,
+      deviceId,
+      state.device.deviceId,
+    );
+    printJson({
+      accountId: result.account.accountId,
+      revokedDeviceId: deviceId,
+      revokedAt: result.account.devices[deviceId].revokedAt,
+    });
+    return;
+  }
+
+  if (command === "fingerprint") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const accountId = requireFlag(flags, "account-id");
+    const deviceId = requireFlag(flags, "device-id");
+    const state = await loadLocalState(stateDir);
+    const accountRecord = state.directoryCache?.[accountId];
+    const deviceRecord =
+      accountId === state.account.accountId && deviceId === state.device.deviceId
+        ? state.device
+        : accountRecord?.devices?.[deviceId];
+
+    if (!deviceRecord) {
+      throw new Error(`Device ${deviceId} for account ${accountId} is not available locally`);
+    }
+
+    printJson({
+      accountId,
+      deviceId,
+      fingerprint: computeDeviceFingerprint(accountId, deviceRecord),
+    });
+    return;
+  }
+
+  if (command === "verify-device") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const accountId = requireFlag(flags, "account-id");
+    const deviceId = requireFlag(flags, "device-id");
+    const expectedFingerprint = requireFlag(flags, "fingerprint");
+    const state = await loadLocalState(stateDir);
+    const nextState = verifyDeviceFingerprint({
+      state,
+      accountId,
+      deviceId,
+      expectedFingerprint,
+    });
+    await saveLocalState(stateDir, nextState);
+    printJson({
+      accountId,
+      deviceId,
+      verified: true,
+      fingerprint: expectedFingerprint,
     });
     return;
   }

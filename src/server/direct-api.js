@@ -25,6 +25,16 @@ export function createDirectApi(store) {
       return { account };
     },
 
+    async revokeDevice(_, accountId, deviceId, revokedByDeviceId = null) {
+      const account = await store.revokeDevice({
+        accountId,
+        deviceId,
+        revokedByDeviceId,
+      });
+
+      return { account };
+    },
+
     async enqueueEnvelope(_, envelope, recipientInboxId) {
       const item = await store.enqueueEnvelope({
         envelope,

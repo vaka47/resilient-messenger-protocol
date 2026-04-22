@@ -57,9 +57,28 @@ node src/cli.js sync --state-dir ./state/alice --base-url http://127.0.0.1:8080
 node src/cli.js inbox --state-dir ./state/alice
 ```
 
+Inspect a cached device fingerprint:
+
+```bash
+node src/cli.js fingerprint --state-dir ./state/alice --account-id BOB_ACCOUNT_ID --device-id BOB_DEVICE_ID
+```
+
+Mark the device as verified after comparing the fingerprint out-of-band:
+
+```bash
+node src/cli.js verify-device --state-dir ./state/alice --account-id BOB_ACCOUNT_ID --device-id BOB_DEVICE_ID --fingerprint "FINGERPRINT"
+```
+
+Revoke Bob laptop:
+
+```bash
+node src/cli.js revoke-device --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --device-id BOB_LAPTOP_DEVICE_ID
+```
+
 Expected result:
 
 - Bob phone receives the message.
 - Bob laptop receives the same message through a separate envelope.
 - Alice's outbound event moves to `delivered` after both encrypted acks arrive.
 - Relay storage never contains plaintext message text.
+- Revoked devices are removed from future fanout and cannot pull old queued envelopes.

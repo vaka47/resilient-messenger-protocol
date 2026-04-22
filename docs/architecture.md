@@ -33,6 +33,7 @@ flowchart TB
   B1 -->|"encrypted ack"| Relay
   B2 -->|"encrypted ack"| Relay
   Relay -->|"ack envelopes"| A1
+  Directory -. "revocation state" .-> Relay
 
   A1 --> LocalLogs
   B1 --> LocalLogs
@@ -55,12 +56,14 @@ Directory service:
 - device descriptors;
 - public encryption and signing keys;
 - inbox identifiers.
+- device revocation state.
 
 Relay service:
 
 - encrypted queue items;
 - expiry timestamps;
 - delivery acknowledgement removal.
+- revoked inbox purge.
 
 The server must not store:
 

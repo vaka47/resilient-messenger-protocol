@@ -10,7 +10,10 @@ Current prototype invariant:
 - payload is sealed before it reaches the relay;
 - relay stores only ciphertext and queue metadata;
 - recipient decrypts locally with a device private key;
-- delivery acknowledgements are also encrypted envelopes.
+- delivery acknowledgements are also encrypted envelopes;
+- message payloads use a prototype per-device ratcheted chain key;
+- device fingerprints can be verified by users;
+- revoked devices are filtered from future fanout and cannot pull their old relay queue.
 
 ## What The Prototype Protects
 
@@ -25,11 +28,11 @@ It protects message content from:
 
 This repository is not yet production E2EE. Missing pieces:
 
-- no Double Ratchet message-key evolution;
+- no full Double Ratchet message-key evolution;
 - no post-compromise recovery after device-key theft;
 - no MLS group encryption;
 - no key transparency or safety-number UX;
-- no device revocation flow;
+- no hardened production revocation UX or transparency log;
 - no secure backup/recovery flow;
 - no push notification privacy design;
 - no audited implementation.

@@ -3,3 +3,5 @@ export * from "./envelope.js";
 export * from "./policy.js";
 export * from "./storage.js";
 export * from "./util.js";
+export * from "./client/identity.js";
+export * from "./client/ratchet.js";

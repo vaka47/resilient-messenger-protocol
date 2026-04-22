@@ -1,8 +1,13 @@
 import crypto from "node:crypto";
 
 import { PAYLOAD_TYPE, PRIORITY, createEnvelope } from "../index.js";
-import { appendEvent, applyDeliveryAck, mergeDirectoryRecord } from "./state.js";
+import { appendEvent, applyDeliveryAck, mergeDirectoryRecord, upsertSession } from "./state.js";
 import { deriveConversationId, openPayload, sealPayload } from "./crypto.js";
+import {
+  getOrCreatePairwiseSession,
+  openWithSession,
+  sealAndSignWithSession,
+} from "./ratchet.js";
 import {
   ackEnvelope,
   enqueueEnvelope,
@@ -12,10 +17,10 @@ import {
 } from "./api.js";
 
 function chooseAccountDevices(accountRecord) {
-  const devices = Object.values(accountRecord.devices || {});
+  const devices = Object.values(accountRecord.devices || {}).filter((device) => !device.revokedAt);
 
   if (devices.length === 0) {
-    throw new Error(`Account ${accountRecord.accountId} has no registered devices`);
+    throw new Error(`Account ${accountRecord.accountId} has no active registered devices`);
   }
 
   return devices;
@@ -31,7 +36,7 @@ async function emitDeliveryAck({
 }) {
   const targetDevice = senderLookup.account.devices[sourceEnvelope.sender.deviceId];
 
-  if (!targetDevice) {
+  if (!targetDevice || targetDevice.revokedAt) {
     return;
   }
 
@@ -97,6 +102,7 @@ export async function sendTextMessage({
   const messageId = crypto.randomUUID();
   const sentAt = new Date().toISOString();
   const envelopes = [];
+  let workingState = mergeDirectoryRecord(state, recipient.account);
 
   for (const recipientDevice of recipientDevices) {
     const aad = {
@@ -107,16 +113,24 @@ export async function sendTextMessage({
       recipientInboxIds: [recipientDevice.inboxId],
     };
 
-    const ciphertext = sealPayload({
+    const sessionResult = getOrCreatePairwiseSession({
+      state: workingState,
+      remoteAccountId: recipient.account.accountId,
+      remoteDevice: recipientDevice,
+    });
+    workingState = sessionResult.state;
+
+    const sealedResult = sealAndSignWithSession({
+      session: sessionResult.session,
       plaintext: {
         messageId,
         text,
         sentAt,
       },
       aad,
-      recipientDhPublicKeyPem: recipientDevice.dhPublicKeyPem,
       senderSigningPrivateKeyPem: state.device.signingPrivateKeyPem,
     });
+    workingState = upsertSession(workingState, sessionResult.sessionKey, sealedResult.session);
 
     const envelope = createEnvelope({
       conversationId,
@@ -125,7 +139,7 @@ export async function sendTextMessage({
       recipientInboxIds: [recipientDevice.inboxId],
       payloadType,
       priority,
-      ciphertext,
+      ciphertext: sealedResult.sealed,
     });
 
     await api.enqueueEnvelope(baseUrl, envelope, recipientDevice.inboxId);
@@ -138,7 +152,7 @@ export async function sendTextMessage({
   }
 
   const nextState = appendEvent(
-    mergeDirectoryRecord(state, recipient.account),
+    workingState,
     {
       kind: "outbound-message",
       envelopeId: envelopes[0].envelopeId,
@@ -184,16 +198,46 @@ export async function syncInboxWithApi({
     const senderLookup = await api.lookupAccount(baseUrl, item.envelope.sender.accountId);
     const senderDevice = senderLookup.account.devices[item.envelope.sender.deviceId];
 
-    if (!senderDevice) {
+    if (!senderDevice || senderDevice.revokedAt) {
+      await api.ackEnvelope(baseUrl, state.device.inboxId, item.envelope.envelopeId);
       continue;
     }
 
-    const payload = openPayload({
-      envelope: item.envelope,
-      ciphertext: item.envelope.ciphertext,
-      recipientDhPrivateKeyPem: state.device.dhPrivateKeyPem,
-      senderSigningPublicKeyPem: senderDevice.signingPublicKeyPem,
-    });
+    const expectedAad = {
+      conversationId: item.envelope.conversationId,
+      senderAccountId: item.envelope.sender.accountId,
+      senderDeviceId: item.envelope.sender.deviceId,
+      payloadType: item.envelope.payloadType,
+      recipientInboxIds: item.envelope.recipients.map((recipient) => recipient.inboxId),
+    };
+
+    let payload;
+
+    if (item.envelope.payloadType === PAYLOAD_TYPE.MESSAGE) {
+      const sessionResult = getOrCreatePairwiseSession({
+        state: nextState,
+        remoteAccountId: senderLookup.account.accountId,
+        remoteDevice: senderDevice,
+      });
+      nextState = sessionResult.state;
+
+      const opened = openWithSession({
+        session: sessionResult.session,
+        sealed: item.envelope.ciphertext,
+        expectedAad,
+        senderSigningPublicKeyPem: senderDevice.signingPublicKeyPem,
+      });
+
+      nextState = upsertSession(nextState, sessionResult.sessionKey, opened.session);
+      payload = opened.plaintext;
+    } else {
+      payload = openPayload({
+        envelope: item.envelope,
+        ciphertext: item.envelope.ciphertext,
+        recipientDhPrivateKeyPem: state.device.dhPrivateKeyPem,
+        senderSigningPublicKeyPem: senderDevice.signingPublicKeyPem,
+      });
+    }
 
     if (item.envelope.payloadType === PAYLOAD_TYPE.ACK) {
       nextState = applyDeliveryAck(nextState, payload);

@@ -46,7 +46,7 @@ These are not invented in-house:
 - `group messaging`: MLS-like group state and key updates.
 - `primitives`: AEAD, HKDF, secure signatures, CSPRNG from mature libraries.
 
-The current codebase contains only a prototype envelope sealing layer. It is useful for demonstrating that relays do not need plaintext access, but it is not a replacement for ratcheted production chat encryption.
+The current codebase contains a prototype envelope sealing layer plus a per-device symmetric ratchet for message payloads. It is useful for demonstrating that relays do not need plaintext access and that message keys can advance, but it is not a replacement for production Double Ratchet or MLS.
 
 ### 3.2 What is novel
 

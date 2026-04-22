@@ -34,6 +34,22 @@ export async function lookupAccount(baseUrl, accountId) {
   return parseJsonResponse(response);
 }
 
+export async function revokeDevice(baseUrl, accountId, deviceId, revokedByDeviceId = null) {
+  const response = await fetch(`${baseUrl}/v1/directory/revoke`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      accountId,
+      deviceId,
+      revokedByDeviceId,
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
 export async function enqueueEnvelope(baseUrl, envelope, recipientInboxId) {
   const response = await fetch(`${baseUrl}/v1/relay/enqueue`, {
     method: "POST",

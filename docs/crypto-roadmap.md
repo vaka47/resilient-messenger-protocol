@@ -9,11 +9,20 @@ Current envelope sealing uses standard Node.js cryptographic primitives:
 - AES-256-GCM authenticated encryption;
 - Ed25519 sender signatures.
 
+Current message payload delivery now additionally includes:
+
+- per-device pairwise session derivation from X25519;
+- directional chain keys;
+- one message key per outbound message;
+- ratchet index enforcement to reject replay against advanced state;
+- Ed25519 signatures over ratcheted payload bodies.
+
 This provides a useful prototype boundary:
 
 - relay cannot decrypt content without recipient private keys;
 - tampering is detected;
-- sender authenticity can be checked against directory public keys.
+- sender authenticity can be checked against directory public keys;
+- basic replay against advanced state is rejected by message index checks.
 
 It is still not enough for production messaging.
 
@@ -23,7 +32,7 @@ Production chat encryption needs more than encrypting one payload:
 
 - forward secrecy across messages;
 - post-compromise recovery;
-- replay handling;
+- full replay handling for out-of-order delivery;
 - skipped-message key handling;
 - device addition/removal safety;
 - group epoch management;
@@ -43,7 +52,7 @@ Implement an X3DH/PQXDH-style bootstrap:
 
 ### Phase 2: `1:1` Ratcheting
 
-Introduce Double Ratchet state:
+Replace the current symmetric ratchet prototype with full Double Ratchet state:
 
 - root key;
 - sending chain key;

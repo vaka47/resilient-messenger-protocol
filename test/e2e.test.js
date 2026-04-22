@@ -121,3 +121,78 @@ test("end-to-end send fans out to multiple devices and returns delivery acks", a
   assert.equal(stats.accountCount, 2);
   assert.equal(stats.queuedItems, 0);
 });
+
+test("revoked devices stop receiving queued and future envelopes", async () => {
+  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "rmp-revoke-"));
+  const dataFile = path.join(tmpRoot, "server-state.json");
+  const aliceDir = path.join(tmpRoot, "alice");
+  const bobPhoneDir = path.join(tmpRoot, "bob-phone");
+  const bobLaptopDir = path.join(tmpRoot, "bob-laptop");
+  const store = new FileBackedStateStore(dataFile);
+  await store.init();
+  const api = createDirectApi(store);
+
+  let alice = await initLocalState({
+    stateDir: aliceDir,
+    displayName: "Alice",
+  });
+  let bobPhone = await initLocalState({
+    stateDir: bobPhoneDir,
+    displayName: "Bob",
+  });
+  let bobLaptop = await linkLocalDevice({
+    sourceStateDir: bobPhoneDir,
+    targetStateDir: bobLaptopDir,
+  });
+
+  alice = await registerStateWithApi({
+    baseUrl: "memory://protocol",
+    state: alice,
+    api,
+  });
+  bobPhone = await registerStateWithApi({
+    baseUrl: "memory://protocol",
+    state: bobPhone,
+    api,
+  });
+  bobLaptop = await registerStateWithApi({
+    baseUrl: "memory://protocol",
+    state: bobLaptop,
+    api,
+  });
+
+  const beforeRevocation = await sendTextMessage({
+    baseUrl: "memory://protocol",
+    state: alice,
+    recipientAccountId: bobPhone.account.accountId,
+    text: "before revoke",
+    api,
+  });
+  assert.equal(beforeRevocation.envelopes.length, 2);
+
+  await api.revokeDevice(
+    "memory://protocol",
+    bobPhone.account.accountId,
+    bobLaptop.device.deviceId,
+    bobPhone.device.deviceId,
+  );
+
+  const revokedLaptopSync = await syncInboxWithApi({
+    baseUrl: "memory://protocol",
+    state: bobLaptop,
+    api,
+  });
+  assert.equal(revokedLaptopSync.queueCount, 0);
+  assert.equal(revokedLaptopSync.messages.length, 0);
+
+  const afterRevocation = await sendTextMessage({
+    baseUrl: "memory://protocol",
+    state: beforeRevocation.state,
+    recipientAccountId: bobPhone.account.accountId,
+    text: "after revoke",
+    api,
+  });
+
+  assert.equal(afterRevocation.envelopes.length, 1);
+  assert.equal(afterRevocation.envelopes[0].recipientDeviceId, bobPhone.device.deviceId);
+});

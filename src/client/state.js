@@ -58,6 +58,8 @@ export async function initLocalState({ stateDir, displayName, force = false }) {
     },
     device: createDeviceMaterial(),
     directoryCache: {},
+    sessions: {},
+    verifiedDevices: {},
     events: [],
   };
 
@@ -74,6 +76,8 @@ export async function linkLocalDevice({ sourceStateDir, targetStateDir, force = 
     account: sourceState.account,
     device: createDeviceMaterial(),
     directoryCache: sourceState.directoryCache,
+    sessions: {},
+    verifiedDevices: sourceState.verifiedDevices || {},
     events: [],
   };
 
@@ -110,6 +114,16 @@ export function mergeDirectoryRecord(state, accountRecord) {
     directoryCache: {
       ...state.directoryCache,
       [accountRecord.accountId]: accountRecord,
+    },
+  };
+}
+
+export function upsertSession(state, sessionKey, session) {
+  return {
+    ...state,
+    sessions: {
+      ...(state.sessions || {}),
+      [sessionKey]: session,
     },
   };
 }

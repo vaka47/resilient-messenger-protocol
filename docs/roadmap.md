@@ -8,8 +8,10 @@ Already implemented:
 - local device identity;
 - linked devices on the same account;
 - encrypted and signed `1:1` message envelopes;
+- prototype per-device ratcheted message chains;
 - file-backed directory and relay;
 - multi-device fanout and delivery acknowledgements;
+- device fingerprints and revocation enforcement;
 - local event history;
 - end-to-end tested send, sync, decrypt, and ack flow.
 
@@ -47,9 +49,9 @@ Exit criteria:
 Build next:
 
 - replace prototype envelope crypto with audited protocol components;
-- introduce Double Ratchet for `1:1`;
+- replace symmetric ratchet prototype with full Double Ratchet for `1:1`;
 - define group roadmap around MLS;
-- add device revocation and recovery flows;
+- add recovery flows, transparency, and audited revocation UX;
 - perform independent security review.
 
 Exit criteria:
