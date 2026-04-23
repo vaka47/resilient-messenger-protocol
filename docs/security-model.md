@@ -18,7 +18,7 @@ Current prototype invariant:
 - registration and revocation are written to an append-only key transparency hash chain;
 - recovery bundles encrypt local account/device key material before export;
 - device fingerprints can be verified by users;
-- account signup is invite-only, phone numbers are unique, and linked devices require the account password;
+- account signup is QR-invite-only, phone numbers are unique, and linked devices require the account password;
 - relay enqueue rejects envelopes for unknown senders, unknown recipients, revoked devices, and inboxes not addressed by the envelope;
 - revoked devices are filtered from future fanout and cannot pull their old relay queue.
 

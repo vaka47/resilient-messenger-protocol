@@ -16,10 +16,10 @@ That means the protocol can be run and verified locally now, but an Android file
 
 The first shippable mobile client should be deliberately small:
 
-- screens: welcome, phone/password, request invite, approve invite, enter code, chat list, chat, device list;
+- screens: welcome, phone/password, render QR invite, scan QR invite, chat list, chat, device list;
 - storage: device private keys in Keychain on iOS and Keystore-backed encrypted storage on Android;
 - networking: HTTPS relay/directory API first, push notifications later;
-- onboarding: exact flow from `docs/account-model.md`;
+- onboarding: exact QR flow from `docs/account-model.md`;
 - messaging: `1:1` text only, one envelope per recipient device;
 - safety UI: show account id, device fingerprint, sponsor, revoked devices, and delivery state.
 
@@ -38,11 +38,11 @@ Recommended implementation path:
 Before handing the app to another person:
 
 - owner can bootstrap the first account;
-- friend can request invite by phone and sponsor phone;
-- sponsor sees and approves the request;
-- sponsor receives a 5-digit code;
-- invitee can complete registration only with the right phone, code, and confirmed password;
-- wrong code, wrong phone, duplicate phone, and wrong password are rejected;
+- sponsor can create a QR invite for a phone number;
+- invitee can complete registration only with the right phone, scanned QR token, and confirmed password;
+- wrong QR token, wrong phone, duplicate phone, and wrong password are rejected;
+- a replacement QR invalidates older active invites for that phone;
+- forgotten-password reset keeps the existing account id and referral link;
 - linked-device registration requires the account password;
 - messages create ciphertext-only relay entries;
 - only addressed active devices receive queued envelopes;

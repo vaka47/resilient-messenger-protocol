@@ -26,7 +26,7 @@ async function createStore(rootPrefix) {
   };
 }
 
-test("invite-only account registration enforces phone ownership and passwords", async () => {
+test("QR-only account registration enforces phone ownership and passwords", async () => {
   const { tmpRoot, store, api } = await createStore("rmp-account-auth-");
   let alice = await initLocalState({
     stateDir: path.join(tmpRoot, "alice"),
@@ -89,29 +89,29 @@ test("invite-only account registration enforces phone ownership and passwords", 
   );
 
   await assert.rejects(
-    api.requestInvite("memory://protocol", "+10000001002", "+19999999999"),
-    /sponsor phone is not registered/,
+    api.createQrInvite("memory://protocol", "missing-sponsor-account", "+10000001002"),
+    /not active/,
   );
 
-  const bobInvite = await api.requestInvite(
-    "memory://protocol",
-    "+10000001002",
-    "+10000001001",
-  );
-  assert.equal("codeRecord" in bobInvite.request, false);
-
-  await assert.rejects(
-    api.requestInvite("memory://protocol", "+10000001002", "+10000001001"),
-    /active invite request/,
-  );
-
-  const bobApproval = await api.approveInvite(
+  const bobInvite = await api.createQrInvite(
     "memory://protocol",
     alice.account.accountId,
-    bobInvite.request.requestId,
+    "+10000001002",
   );
-  assert.match(bobApproval.code, /^\d{5}$/);
-  assert.equal("codeRecord" in bobApproval.request, false);
+  assert.equal(bobInvite.request.mode, "qr");
+  assert.equal(bobInvite.request.purpose, "registration");
+  assert.equal("qrTokenRecord" in bobInvite.request, false);
+  assert.equal(bobInvite.qrPayload.type, "rmp.qr-invite.v1");
+
+  const replacementInvite = await api.createQrInvite(
+    "memory://protocol",
+    alice.account.accountId,
+    "+10000001002",
+  );
+  assert.equal(
+    store.state.directory.inviteRequests[bobInvite.request.requestId].status,
+    "replaced",
+  );
 
   await assert.rejects(
     completeRegistrationStateWithApi({
@@ -119,12 +119,12 @@ test("invite-only account registration enforces phone ownership and passwords", 
       state: bob,
       api,
       requestId: bobInvite.request.requestId,
-      code: "00000",
+      qrToken: bobInvite.qrToken,
       phone: "+10000001002",
       password: "bob-password-123",
       passwordConfirm: "bob-password-123",
     }),
-    /invalid invite code/,
+    /invite request is not approved/,
   );
 
   await assert.rejects(
@@ -132,8 +132,22 @@ test("invite-only account registration enforces phone ownership and passwords", 
       baseUrl: "memory://protocol",
       state: bob,
       api,
-      requestId: bobInvite.request.requestId,
-      code: bobApproval.code,
+      requestId: replacementInvite.request.requestId,
+      qrToken: "wrong-qr-token",
+      phone: "+10000001002",
+      password: "bob-password-123",
+      passwordConfirm: "bob-password-123",
+    }),
+    /invalid QR invite token/,
+  );
+
+  await assert.rejects(
+    completeRegistrationStateWithApi({
+      baseUrl: "memory://protocol",
+      state: bob,
+      api,
+      requestId: replacementInvite.request.requestId,
+      qrToken: replacementInvite.qrToken,
       phone: "+10000001003",
       password: "bob-password-123",
       passwordConfirm: "bob-password-123",
@@ -145,8 +159,8 @@ test("invite-only account registration enforces phone ownership and passwords", 
     baseUrl: "memory://protocol",
     state: bob,
     api,
-    requestId: bobInvite.request.requestId,
-    code: bobApproval.code,
+    requestId: replacementInvite.request.requestId,
+    qrToken: replacementInvite.qrToken,
     phone: "+10000001002",
     password: "bob-password-123",
     passwordConfirm: "bob-password-123",
@@ -160,18 +174,13 @@ test("invite-only account registration enforces phone ownership and passwords", 
       baseUrl: "memory://protocol",
       state: bob,
       api,
-      requestId: bobInvite.request.requestId,
-      code: bobApproval.code,
+      requestId: replacementInvite.request.requestId,
+      qrToken: replacementInvite.qrToken,
       phone: "+10000001002",
       password: "bob-password-123",
       passwordConfirm: "bob-password-123",
     }),
     /invite request is not approved/,
-  );
-
-  await assert.rejects(
-    api.requestInvite("memory://protocol", "+10000001002", "+10000001001"),
-    /phone is already registered/,
   );
 
   const bobLaptop = await linkLocalDevice({
@@ -195,22 +204,17 @@ test("invite-only account registration enforces phone ownership and passwords", 
     password: "bob-password-123",
   });
 
-  const carolInvite = await api.requestInvite(
-    "memory://protocol",
-    "+10000001003",
-    "+10000001002",
-  );
-  const carolApproval = await api.approveInvite(
+  const carolInvite = await api.createQrInvite(
     "memory://protocol",
     bob.account.accountId,
-    carolInvite.request.requestId,
+    "+10000001003",
   );
   carol = await completeRegistrationStateWithApi({
     baseUrl: "memory://protocol",
     state: carol,
     api,
     requestId: carolInvite.request.requestId,
-    code: carolApproval.code,
+    qrToken: carolInvite.qrToken,
     phone: "+10000001003",
     password: "carol-password-123",
     passwordConfirm: "carol-password-123",
@@ -222,6 +226,79 @@ test("invite-only account registration enforces phone ownership and passwords", 
   assert.equal("passwordRecord" in publicBob.account, false);
   assert.equal(publicBob.account.devices[bob.device.deviceId].oneTimePreKeyIds.length, 5);
   assert.equal("oneTimePreKeys" in publicBob.account.devices[bob.device.deviceId], false);
+});
+
+test("original inviter can reset a forgotten password by issuing a replacement QR invite", async () => {
+  const { tmpRoot, store, api } = await createStore("rmp-password-reset-");
+  let alice = await initLocalState({
+    stateDir: path.join(tmpRoot, "alice"),
+    displayName: "Alice",
+  });
+  let bob = await initLocalState({
+    stateDir: path.join(tmpRoot, "bob"),
+    displayName: "Bob",
+  });
+  const bobResetDevice = await initLocalState({
+    stateDir: path.join(tmpRoot, "bob-reset"),
+    displayName: "Bob",
+  });
+
+  alice = await bootstrapStateWithApi({
+    baseUrl: "memory://protocol",
+    state: alice,
+    api,
+    phone: "+10000001101",
+    password: "alice-password-123",
+    passwordConfirm: "alice-password-123",
+  });
+  const bobInvite = await api.createQrInvite(
+    "memory://protocol",
+    alice.account.accountId,
+    "+10000001102",
+  );
+  bob = await completeRegistrationStateWithApi({
+    baseUrl: "memory://protocol",
+    state: bob,
+    api,
+    requestId: bobInvite.request.requestId,
+    qrToken: bobInvite.qrToken,
+    phone: "+10000001102",
+    password: "old-bob-password-123",
+    passwordConfirm: "old-bob-password-123",
+  });
+
+  const resetInvite = await api.createQrInvite(
+    "memory://protocol",
+    alice.account.accountId,
+    "+10000001102",
+  );
+  assert.equal(resetInvite.request.purpose, "password-reset");
+
+  const resetState = await completeRegistrationStateWithApi({
+    baseUrl: "memory://protocol",
+    state: bobResetDevice,
+    api,
+    requestId: resetInvite.request.requestId,
+    qrToken: resetInvite.qrToken,
+    phone: "+10000001102",
+    password: "new-bob-password-123",
+    passwordConfirm: "new-bob-password-123",
+  });
+
+  assert.equal(resetState.account.accountId, bob.account.accountId);
+  assert.equal(store.state.directory.accounts[bob.account.accountId].invitedByAccountId, alice.account.accountId);
+  assert.equal(store.state.directory.accounts[bob.account.accountId].devices[resetState.device.deviceId].deviceId, resetState.device.deviceId);
+
+  await assert.rejects(
+    api.loginByPhone("memory://protocol", "+10000001102", "old-bob-password-123"),
+    /invalid phone or password/,
+  );
+  const login = await api.loginByPhone(
+    "memory://protocol",
+    "+10000001102",
+    "new-bob-password-123",
+  );
+  assert.equal(login.account.accountId, bob.account.accountId);
 });
 
 test("relay queues envelopes only for active addressed devices", async () => {
@@ -243,18 +320,17 @@ test("relay queues envelopes only for active addressed devices", async () => {
     password: "alice-password-123",
     passwordConfirm: "alice-password-123",
   });
-  const invite = await api.requestInvite("memory://protocol", "+10000002002", "+10000002001");
-  const approval = await api.approveInvite(
+  const invite = await api.createQrInvite(
     "memory://protocol",
     alice.account.accountId,
-    invite.request.requestId,
+    "+10000002002",
   );
   bob = await completeRegistrationStateWithApi({
     baseUrl: "memory://protocol",
     state: bob,
     api,
     requestId: invite.request.requestId,
-    code: approval.code,
+    qrToken: invite.qrToken,
     phone: "+10000002002",
     password: "bob-password-123",
     passwordConfirm: "bob-password-123",

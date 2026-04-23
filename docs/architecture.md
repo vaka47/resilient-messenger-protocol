@@ -24,7 +24,7 @@ flowchart TB
   LocalLogs["Local event logs\nsource of durable history"]
 
   A1 -->|"bootstrap owner"| Directory
-  B1 -->|"request invite, complete with code"| Directory
+  B1 -->|"scan sponsor QR invite"| Directory
   B2 -->|"register linked device with password"| Directory
 
   A1 -->|"lookup Bob devices"| Directory

@@ -84,6 +84,8 @@ function applyRegisteredAccount(state, account) {
     ...mergeDirectoryRecord(state, account),
     account: {
       ...state.account,
+      accountId: account.accountId,
+      displayName: account.displayName,
       phone: account.phone,
       status: account.status,
       invitedByAccountId: account.invitedByAccountId || null,
@@ -107,11 +109,11 @@ export async function bootstrapState(baseUrl, state, { phone, password, password
 export async function completeRegistrationState(
   baseUrl,
   state,
-  { requestId, code, phone, password, passwordConfirm },
+  { requestId, qrToken, phone, password, passwordConfirm },
 ) {
   const result = await completeRegistration(baseUrl, state, {
     requestId,
-    code,
+    qrToken,
     phone,
     password,
     passwordConfirm,
@@ -371,14 +373,14 @@ export async function completeRegistrationStateWithApi({
   state,
   api,
   requestId,
-  code,
+  qrToken,
   phone,
   password,
   passwordConfirm,
 }) {
   const result = await api.completeRegistration(baseUrl, state, {
     requestId,
-    code,
+    qrToken,
     phone,
     password,
     passwordConfirm,

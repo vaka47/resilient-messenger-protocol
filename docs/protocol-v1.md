@@ -209,7 +209,8 @@ This service should be tiny and strongly verifiable.
 Current prototype:
 
 - bootstraps only the first owner directly;
-- accepts new accounts only through sponsor-approved phone invites and 5-digit out-of-band codes;
+- accepts new accounts only through sponsor-created QR invites with high-entropy one-time secrets;
+- supports forgotten-password reset through a replacement QR invite from the original inviter while preserving the account id;
 - requires account password verification for login and linked-device registration;
 - publishes only public device and prekey material;
 - consumes one-time prekeys during session bootstrap;

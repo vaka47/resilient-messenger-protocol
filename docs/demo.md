@@ -4,7 +4,7 @@ This script demonstrates the current protocol flow:
 
 - Alice sends one message.
 - Alice bootstraps the first account.
-- Bob joins only after Alice approves his phone-number request and gives him a 5-digit code.
+- Bob joins only after scanning a QR invite created by Alice for Bob's phone number.
 - Bob has two linked devices.
 - Bob can sponsor the next user with the same approval flow.
 - Relay stores ciphertext only.
@@ -28,23 +28,17 @@ node src/cli.js init --state-dir ./state/alice --name Alice
 node src/cli.js bootstrap-owner --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000001 --password "alice-password-123" --password-confirm "alice-password-123"
 ```
 
-Create Bob phone and request access through Alice:
+Create Bob phone and create Alice's QR invite for Bob:
 
 ```bash
 node src/cli.js init --state-dir ./state/bob-phone --name Bob
-node src/cli.js request-invite --base-url http://127.0.0.1:8080 --phone +10000000002 --sponsor-phone +10000000001
+node src/cli.js create-qr-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000002
 ```
 
-Alice approves the request. Give Bob the returned `code` out-of-band:
+Bob scans the QR and completes registration:
 
 ```bash
-node src/cli.js approve-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --request-id REQUEST_ID
-```
-
-Bob completes registration:
-
-```bash
-node src/cli.js complete-registration --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --code 12345 --phone +10000000002 --password "bob-password-123" --password-confirm "bob-password-123"
+node src/cli.js complete-registration --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --qr-token QR_TOKEN --phone +10000000002 --password "bob-password-123" --password-confirm "bob-password-123"
 ```
 
 Create Bob laptop:
@@ -58,9 +52,8 @@ Optional: Bob sponsors Carol:
 
 ```bash
 node src/cli.js init --state-dir ./state/carol --name Carol
-node src/cli.js request-invite --base-url http://127.0.0.1:8080 --phone +10000000003 --sponsor-phone +10000000002
-node src/cli.js approve-invite --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID
-node src/cli.js complete-registration --state-dir ./state/carol --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID --code 12345 --phone +10000000003 --password "carol-password-123" --password-confirm "carol-password-123"
+node src/cli.js create-qr-invite --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --phone +10000000003
+node src/cli.js complete-registration --state-dir ./state/carol --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID --qr-token CAROL_QR_TOKEN --phone +10000000003 --password "carol-password-123" --password-confirm "carol-password-123"
 ```
 
 Send from Alice:
@@ -117,7 +110,7 @@ Expected result:
 
 - Bob phone receives the message.
 - Bob laptop receives the same message through a separate envelope.
-- Bob could only join after Alice's approval code, and Bob's linked device required Bob's password.
+- Bob could only join after scanning Alice's QR invite, and Bob's linked device required Bob's password.
 - Alice's outbound event moves to `delivered` after both encrypted acks arrive.
 - Relay storage never contains plaintext message text.
 - Directory storage contains public prekeys only, not private key material.

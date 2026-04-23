@@ -4,11 +4,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
-  approveInvite,
+  createQrInvite,
   fetchStats,
   fetchTransparencyLog,
   loginByPhone,
-  requestInvite,
   revokeDevice,
 } from "./client/api.js";
 import { computeDeviceFingerprint, verifyDeviceFingerprint } from "./client/identity.js";
@@ -40,9 +39,8 @@ function printHelp() {
   init --state-dir ./state/alice --name Alice [--force]
   link-device --from-state-dir ./state/bob-phone --state-dir ./state/bob-laptop [--force]
   bootstrap-owner --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000001 --password "long-password" --password-confirm "long-password"
-  request-invite --base-url http://127.0.0.1:8080 --phone +10000000002 --sponsor-phone +10000000001
-  approve-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --request-id REQUEST_ID
-  complete-registration --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --code 12345 --phone +10000000002 --password "long-password" --password-confirm "long-password"
+  create-qr-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000002
+  complete-registration --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --qr-token QR_TOKEN --phone +10000000002 --password "long-password" --password-confirm "long-password"
   login --base-url http://127.0.0.1:8080 --phone +10000000002 --password "long-password"
   register --state-dir ./state/alice --base-url http://127.0.0.1:8080 --password "long-password"
   fingerprint --state-dir ./state/alice --account-id ACCOUNT_ID --device-id DEVICE_ID
@@ -148,31 +146,22 @@ async function main() {
     return;
   }
 
-  if (command === "request-invite") {
-    const baseUrl = requireFlag(flags, "base-url");
-    const phone = requireFlag(flags, "phone");
-    const sponsorPhone = requireFlag(flags, "sponsor-phone");
-    const result = await requestInvite(baseUrl, {
-      phone,
-      sponsorPhone,
-    });
-    printJson(result);
-    return;
-  }
-
-  if (command === "approve-invite") {
+  if (command === "create-qr-invite") {
     const stateDir = path.resolve(requireFlag(flags, "state-dir"));
     const baseUrl = requireFlag(flags, "base-url");
-    const requestId = requireFlag(flags, "request-id");
+    const phone = requireFlag(flags, "phone");
     const state = await loadLocalState(stateDir);
-    const result = await approveInvite(baseUrl, {
+    const result = await createQrInvite(baseUrl, {
       sponsorAccountId: state.account.accountId,
-      requestId,
+      phone,
     });
     printJson({
       requestId: result.request.requestId,
       phone: result.request.phone,
-      code: result.code,
+      purpose: result.request.purpose,
+      qrPayload: result.qrPayload,
+      qrPayloadB64: result.qrPayloadB64,
+      qrToken: result.qrToken,
       expiresAt: result.request.expiresAt,
     });
     return;
@@ -182,14 +171,19 @@ async function main() {
     const stateDir = path.resolve(requireFlag(flags, "state-dir"));
     const baseUrl = requireFlag(flags, "base-url");
     const requestId = requireFlag(flags, "request-id");
-    const code = requireFlag(flags, "code");
+    const qrToken = typeof flags["qr-token"] === "string" ? flags["qr-token"] : null;
     const phone = requireFlag(flags, "phone");
     const password = requireFlag(flags, "password");
     const passwordConfirm = requireFlag(flags, "password-confirm");
+
+    if (!qrToken) {
+      throw new Error("complete-registration requires --qr-token for QR invites");
+    }
+
     const state = await loadLocalState(stateDir);
     const nextState = await completeRegistrationState(baseUrl, state, {
       requestId,
-      code,
+      qrToken,
       phone,
       password,
       passwordConfirm,

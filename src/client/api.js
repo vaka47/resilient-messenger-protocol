@@ -68,30 +68,15 @@ export async function bootstrapAccount(baseUrl, state, { phone, password, passwo
   return parseJsonResponse(response);
 }
 
-export async function requestInvite(baseUrl, { phone, sponsorPhone }) {
-  const response = await fetch(`${baseUrl}/v1/invites/request`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      phone,
-      sponsorPhone,
-    }),
-  });
-
-  return parseJsonResponse(response);
-}
-
-export async function approveInvite(baseUrl, { sponsorAccountId, requestId }) {
-  const response = await fetch(`${baseUrl}/v1/invites/approve`, {
+export async function createQrInvite(baseUrl, { sponsorAccountId, phone }) {
+  const response = await fetch(`${baseUrl}/v1/invites/qr`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
     body: JSON.stringify({
       sponsorAccountId,
-      requestId,
+      phone,
     }),
   });
 
@@ -101,7 +86,7 @@ export async function approveInvite(baseUrl, { sponsorAccountId, requestId }) {
 export async function completeRegistration(
   baseUrl,
   state,
-  { requestId, code, phone, password, passwordConfirm },
+  { requestId, qrToken, phone, password, passwordConfirm },
 ) {
   const response = await fetch(`${baseUrl}/v1/accounts/complete-registration`, {
     method: "POST",
@@ -110,7 +95,7 @@ export async function completeRegistration(
     },
     body: JSON.stringify({
       requestId,
-      code,
+      qrToken,
       accountId: state.account.accountId,
       displayName: state.account.displayName,
       phone,

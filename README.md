@@ -11,7 +11,7 @@ The project explores a practical question: what should a messenger do when norma
 
 - Transport-agnostic encrypted envelopes.
 - File-backed directory and relay server.
-- Invite-only phone onboarding with sponsor approval and a 5-digit out-of-band code.
+- QR-only phone onboarding with sponsor approval and a high-entropy invite secret.
 - Password-protected account login and linked-device registration.
 - Local device identity with linked devices.
 - Multi-device recipient fanout.
@@ -60,6 +60,7 @@ Detailed docs:
 - [Account and invite model](docs/account-model.md)
 - [Security model](docs/security-model.md)
 - [Mobile runbook](docs/mobile-runbook.md)
+- [Cryptographic standards plan](docs/crypto-standards.md)
 - [Crypto roadmap](docs/crypto-roadmap.md)
 - [Group security boundary](docs/group-security.md)
 - [Production readiness](docs/production-readiness.md)
@@ -76,7 +77,8 @@ Implemented:
 
 - local device identity;
 - linked devices for one account;
-- owner bootstrap, phone-based invite requests, sponsor approval, and invite-code completion;
+- owner bootstrap, sponsor-created QR invites, phone binding, and referral-chain completion;
+- password reset through a replacement QR invite from the original inviter;
 - password verification for login and linked-device registration;
 - directory registration that publishes only public device and prekey material;
 - relay queue delivery with encrypted delivery ack;
@@ -141,23 +143,17 @@ node src/cli.js init --state-dir ./state/alice --name Alice
 node src/cli.js bootstrap-owner --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000001 --password "alice-password-123" --password-confirm "alice-password-123"
 ```
 
-Bob installs the app, initializes local state, and requests access through Alice's phone number:
+Alice creates a QR invite for Bob's phone number. The returned `qrPayloadB64` is what the mobile app should render as a QR code:
 
 ```bash
 node src/cli.js init --state-dir ./state/bob --name Bob
-node src/cli.js request-invite --base-url http://127.0.0.1:8080 --phone +10000000002 --sponsor-phone +10000000001
+node src/cli.js create-qr-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000002
 ```
 
-Alice approves Bob's request and reads the 5-digit code to Bob out-of-band:
+Bob scans the QR code and completes registration with the exact phone number and confirmed password:
 
 ```bash
-node src/cli.js approve-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --request-id REQUEST_ID
-```
-
-Bob completes registration with the exact phone number, 5-digit code, and confirmed password:
-
-```bash
-node src/cli.js complete-registration --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --code 12345 --phone +10000000002 --password "bob-password-123" --password-confirm "bob-password-123"
+node src/cli.js complete-registration --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --qr-token QR_TOKEN --phone +10000000002 --password "bob-password-123" --password-confirm "bob-password-123"
 ```
 
 Add Bob's second device:
@@ -171,9 +167,8 @@ Bob can now sponsor the next user, for example Carol:
 
 ```bash
 node src/cli.js init --state-dir ./state/carol --name Carol
-node src/cli.js request-invite --base-url http://127.0.0.1:8080 --phone +10000000003 --sponsor-phone +10000000002
-node src/cli.js approve-invite --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID
-node src/cli.js complete-registration --state-dir ./state/carol --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID --code 12345 --phone +10000000003 --password "carol-password-123" --password-confirm "carol-password-123"
+node src/cli.js create-qr-invite --state-dir ./state/bob --base-url http://127.0.0.1:8080 --phone +10000000003
+node src/cli.js complete-registration --state-dir ./state/carol --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID --qr-token CAROL_QR_TOKEN --phone +10000000003 --password "carol-password-123" --password-confirm "carol-password-123"
 ```
 
 Login check after logout:
@@ -181,6 +176,15 @@ Login check after logout:
 ```bash
 node src/cli.js login --base-url http://127.0.0.1:8080 --phone +10000000002 --password "bob-password-123"
 ```
+
+Forgotten password flow:
+
+```bash
+node src/cli.js create-qr-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000002
+node src/cli.js complete-registration --state-dir ./state/bob-restored --base-url http://127.0.0.1:8080 --request-id RESET_REQUEST_ID --qr-token RESET_QR_TOKEN --phone +10000000002 --password "new-bob-password-123" --password-confirm "new-bob-password-123"
+```
+
+The reset QR replaces older active invites for that phone and keeps Bob's existing account id/referral link. Local chat history remains local to devices unless separately backed up.
 
 Send a message from Alice to Bob:
 

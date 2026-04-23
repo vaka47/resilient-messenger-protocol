@@ -86,20 +86,16 @@ test("HTTP account endpoints support owner bootstrap and sponsor-approved regist
   });
   assert.equal(owner.account.phone, "+10000003001");
 
-  const invite = await postJson(server, "/v1/invites/request", {
+  const invite = await postJson(server, "/v1/invites/qr", {
     phone: "+10000003002",
-    sponsorPhone: "+10000003001",
-  });
-  const approval = await postJson(server, "/v1/invites/approve", {
     sponsorAccountId: owner.account.accountId,
-    requestId: invite.request.requestId,
   });
-  assert.match(approval.code, /^\d{5}$/);
-  assert.equal("codeRecord" in approval.request, false);
+  assert.equal(invite.qrPayload.type, "rmp.qr-invite.v1");
+  assert.equal("qrTokenRecord" in invite.request, false);
 
   const registration = await postJson(server, "/v1/accounts/complete-registration", {
     requestId: invite.request.requestId,
-    code: approval.code,
+    qrToken: invite.qrToken,
     accountId: bob.account.accountId,
     displayName: bob.account.displayName,
     phone: "+10000003002",

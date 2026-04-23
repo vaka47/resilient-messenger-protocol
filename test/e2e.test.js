@@ -54,24 +54,19 @@ test("end-to-end send fans out to multiple devices and returns delivery acks", a
     passwordConfirm: "alice-password-123",
   });
 
-  const inviteRequest = await api.requestInvite(
-    "memory://protocol",
-    "+10000000002",
-    "+10000000001",
-  );
-  const approval = await api.approveInvite(
+  const inviteRequest = await api.createQrInvite(
     "memory://protocol",
     alice.account.accountId,
-    inviteRequest.request.requestId,
+    "+10000000002",
   );
-  assert.match(approval.code, /^\d{5}$/);
+  assert.equal(inviteRequest.request.mode, "qr");
 
   bobPhone = await completeRegistrationStateWithApi({
     baseUrl: "memory://protocol",
     state: bobPhone,
     api,
     requestId: inviteRequest.request.requestId,
-    code: approval.code,
+    qrToken: inviteRequest.qrToken,
     phone: "+10000000002",
     password: "bob-password-123",
     passwordConfirm: "bob-password-123",
@@ -195,22 +190,17 @@ test("revoked devices stop receiving queued and future envelopes", async () => {
     password: "alice-password-123",
     passwordConfirm: "alice-password-123",
   });
-  const inviteRequest = await api.requestInvite(
-    "memory://protocol",
-    "+10000000012",
-    "+10000000011",
-  );
-  const approval = await api.approveInvite(
+  const inviteRequest = await api.createQrInvite(
     "memory://protocol",
     alice.account.accountId,
-    inviteRequest.request.requestId,
+    "+10000000012",
   );
   bobPhone = await completeRegistrationStateWithApi({
     baseUrl: "memory://protocol",
     state: bobPhone,
     api,
     requestId: inviteRequest.request.requestId,
-    code: approval.code,
+    qrToken: inviteRequest.qrToken,
     phone: "+10000000012",
     password: "bob-password-123",
     passwordConfirm: "bob-password-123",

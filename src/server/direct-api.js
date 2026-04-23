@@ -48,28 +48,17 @@ export function createDirectApi(store) {
       return { account };
     },
 
-    async requestInvite(_, phone, sponsorPhone) {
-      const request = await store.requestInvite({
-        phone,
-        sponsorPhone,
-      });
-
-      return { request };
-    },
-
-    async approveInvite(_, sponsorAccountId, requestId) {
-      const result = await store.approveInvite({
+    async createQrInvite(_, sponsorAccountId, phone) {
+      return store.createQrInvite({
         sponsorAccountId,
-        requestId,
+        phone,
       });
-
-      return result;
     },
 
-    async completeRegistration(_, state, { requestId, code, phone, password, passwordConfirm }) {
+    async completeRegistration(_, state, { requestId, qrToken, phone, password, passwordConfirm }) {
       const account = await store.completeRegistration({
         requestId,
-        code,
+        qrToken,
         accountId: state.account.accountId,
         displayName: state.account.displayName,
         phone,

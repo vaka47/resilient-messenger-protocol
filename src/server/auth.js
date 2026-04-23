@@ -47,27 +47,27 @@ export function verifyPassword(password, record) {
   return crypto.timingSafeEqual(actual, expected);
 }
 
-export function createInviteCode() {
-  return String(crypto.randomInt(0, 100000)).padStart(5, "0");
+export function createQrInviteToken() {
+  return crypto.randomBytes(32).toString("base64url");
 }
 
-export function createInviteCodeRecord(code) {
+export function createQrInviteTokenRecord(token) {
   const salt = crypto.randomBytes(16);
   const digest = crypto
     .createHash("sha256")
     .update(salt)
-    .update(code)
+    .update(token)
     .digest();
 
   return {
-    profile: "INVITE-CODE-SHA256-V1",
+    profile: "QR-INVITE-TOKEN-SHA256-V1",
     saltB64: salt.toString("base64"),
     digestB64: digest.toString("base64"),
   };
 }
 
-export function verifyInviteCode(code, record) {
-  if (!/^\d{5}$/.test(code || "") || !record?.saltB64 || !record?.digestB64) {
+export function verifyQrInviteToken(token, record) {
+  if (typeof token !== "string" || token.length < 32 || !record?.saltB64 || !record?.digestB64) {
     return false;
   }
 
@@ -76,7 +76,7 @@ export function verifyInviteCode(code, record) {
   const actual = crypto
     .createHash("sha256")
     .update(salt)
-    .update(code)
+    .update(token)
     .digest();
 
   return crypto.timingSafeEqual(actual, expected);

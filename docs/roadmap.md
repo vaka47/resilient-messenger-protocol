@@ -25,7 +25,7 @@ Build next:
 
 - Android client with local database;
 - background sync worker;
-- contact add flow by QR or invite code;
+- contact add flow by sponsor-created QR invite;
 - better queue retry and backoff;
 - message status transitions: queued, relayed, delivered, seen.
 

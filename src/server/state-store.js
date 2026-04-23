@@ -10,12 +10,12 @@ import {
 } from "./transparency.js";
 import {
   assertPasswordConfirmed,
-  createInviteCode,
-  createInviteCodeRecord,
+  createQrInviteToken,
+  createQrInviteTokenRecord,
   createPasswordRecord,
   normalizePhone,
-  verifyInviteCode,
   verifyPassword,
+  verifyQrInviteToken,
 } from "./auth.js";
 
 function createInitialState() {
@@ -98,6 +98,8 @@ function publicInviteRequestRecord(request) {
 
   return {
     requestId: request.requestId,
+    mode: request.mode || "qr",
+    purpose: request.purpose || "registration",
     phone: request.phone,
     sponsorAccountId: request.sponsorAccountId,
     status: request.status,
@@ -106,7 +108,25 @@ function publicInviteRequestRecord(request) {
     approvedAt: request.approvedAt || null,
     usedAt: request.usedAt || null,
     inviteeAccountId: request.inviteeAccountId || null,
+    replacedAt: request.replacedAt || null,
+    replacedByRequestId: request.replacedByRequestId || null,
   };
+}
+
+function createQrPayload({ request, token }) {
+  return {
+    type: "rmp.qr-invite.v1",
+    requestId: request.requestId,
+    phone: request.phone,
+    sponsorAccountId: request.sponsorAccountId,
+    purpose: request.purpose,
+    expiresAt: request.expiresAt,
+    token,
+  };
+}
+
+function encodeQrPayload(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
 
 export class FileBackedStateStore {
@@ -223,81 +243,73 @@ export class FileBackedStateStore {
     return publicAccountRecord(existing);
   }
 
-  async requestInvite({ phone, sponsorPhone }) {
+  invalidateActiveInvitesForPhone(phone, { reason, replacedByRequestId = null } = {}) {
+    for (const request of Object.values(this.state.directory.inviteRequests)) {
+      const active = ["pending", "approved"].includes(request.status);
+
+      if (request.phone === phone && active) {
+        request.status = reason || "replaced";
+        request.replacedAt = new Date().toISOString();
+        request.replacedByRequestId = replacedByRequestId;
+      }
+    }
+  }
+
+  async createQrInvite({ sponsorAccountId, phone }) {
+    const sponsor = this.assertActiveAccount(sponsorAccountId);
     const normalizedPhone = normalizePhone(phone);
-    const normalizedSponsorPhone = normalizePhone(sponsorPhone);
-    const sponsorAccountId = this.state.directory.phoneIndex[normalizedSponsorPhone];
-    const sponsor = sponsorAccountId ? this.assertActiveAccount(sponsorAccountId) : null;
+    const existingAccountId = this.state.directory.phoneIndex[normalizedPhone] || null;
+    const existingAccount = existingAccountId
+      ? this.state.directory.accounts[existingAccountId]
+      : null;
 
-    if (!sponsor) {
-      throw new Error("sponsor phone is not registered");
-    }
-
-    if (this.state.directory.phoneIndex[normalizedPhone]) {
-      throw new Error("phone is already registered");
-    }
-
-    const activeRequest = Object.values(this.state.directory.inviteRequests).find(
-      (request) =>
-        request.phone === normalizedPhone &&
-        ["pending", "approved"].includes(request.status) &&
-        Date.parse(request.expiresAt) > Date.now(),
-    );
-
-    if (activeRequest) {
-      throw new Error("phone already has an active invite request");
+    if (
+      existingAccount &&
+      existingAccount.invitedByAccountId !== sponsor.accountId &&
+      existingAccount.accountId !== sponsor.accountId
+    ) {
+      throw new Error("only the original inviter can re-invite this phone");
     }
 
     const requestId = crypto.randomUUID();
+    const token = createQrInviteToken();
     const request = {
       requestId,
+      mode: "qr",
+      purpose: existingAccount ? "password-reset" : "registration",
       phone: normalizedPhone,
-      sponsorAccountId,
-      status: "pending",
+      sponsorAccountId: sponsor.accountId,
+      status: "approved",
       createdAt: new Date().toISOString(),
+      approvedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 1000 * 60 * 15).toISOString(),
+      inviteeAccountId: existingAccount?.accountId || null,
+      qrTokenRecord: createQrInviteTokenRecord(token),
     };
 
+    this.invalidateActiveInvitesForPhone(normalizedPhone, {
+      reason: "replaced",
+      replacedByRequestId: requestId,
+    });
     this.state.directory.inviteRequests[requestId] = request;
     await this.persist();
-    return publicInviteRequestRecord(request);
-  }
 
-  async approveInvite({ sponsorAccountId, requestId }) {
-    const sponsor = this.assertActiveAccount(sponsorAccountId);
-    const request = this.state.directory.inviteRequests[requestId];
-
-    if (!request) {
-      throw new Error(`Invite request ${requestId} not found`);
-    }
-
-    if (request.sponsorAccountId !== sponsor.accountId) {
-      throw new Error("invite request does not belong to this sponsor");
-    }
-
-    if (request.status !== "pending") {
-      throw new Error(`invite request is not pending: ${request.status}`);
-    }
-
-    if (Date.parse(request.expiresAt) <= Date.now()) {
-      throw new Error("invite request expired");
-    }
-
-    const code = createInviteCode();
-    request.status = "approved";
-    request.approvedAt = new Date().toISOString();
-    request.codeRecord = createInviteCodeRecord(code);
-    await this.persist();
+    const qrPayload = createQrPayload({
+      request,
+      token,
+    });
 
     return {
       request: publicInviteRequestRecord(request),
-      code,
+      qrPayload,
+      qrPayloadB64: encodeQrPayload(qrPayload),
+      qrToken: token,
     };
   }
 
   async completeRegistration({
     requestId,
-    code,
+    qrToken,
     accountId,
     displayName,
     phone,
@@ -321,19 +333,46 @@ export class FileBackedStateStore {
       throw new Error("phone does not match invite request");
     }
 
-    if (!verifyInviteCode(code, request.codeRecord)) {
-      throw new Error("invalid invite code");
+    if (request.mode !== "qr") {
+      throw new Error("invite request must be QR-based");
     }
 
-    if (this.state.directory.phoneIndex[normalizedPhone]) {
-      throw new Error("phone is already registered");
+    if (!verifyQrInviteToken(qrToken, request.qrTokenRecord)) {
+      throw new Error("invalid QR invite token");
+    }
+
+    assertPasswordConfirmed(password, passwordConfirm);
+    const existingAccountId = this.state.directory.phoneIndex[normalizedPhone] || null;
+
+    if (existingAccountId) {
+      const existingAccount = this.state.directory.accounts[existingAccountId];
+
+      if (request.purpose !== "password-reset") {
+        throw new Error("phone is already registered");
+      }
+
+      if (existingAccount.invitedByAccountId !== request.sponsorAccountId) {
+        throw new Error("password reset must be approved by the original inviter");
+      }
+
+      existingAccount.passwordRecord = createPasswordRecord(password);
+      existingAccount.passwordResetAt = new Date().toISOString();
+      request.status = "used";
+      request.usedAt = new Date().toISOString();
+      request.inviteeAccountId = existingAccount.accountId;
+
+      await this.addDeviceToActiveAccount({
+        account: existingAccount,
+        displayName,
+        device,
+        eventType: "account.password-reset",
+      });
+      return publicAccountRecord(this.state.directory.accounts[existingAccount.accountId]);
     }
 
     if (this.state.directory.accounts[accountId]) {
       throw new Error("account is already registered");
     }
-
-    assertPasswordConfirmed(password, passwordConfirm);
 
     const account = {
       accountId,

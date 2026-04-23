@@ -56,16 +56,9 @@ export function createProtocolServer({ store }) {
         return;
       }
 
-      if (request.method === "POST" && url.pathname === "/v1/invites/request") {
+      if (request.method === "POST" && url.pathname === "/v1/invites/qr") {
         const body = await readJsonBody(request);
-        const requestRecord = await store.requestInvite(body);
-        sendJson(response, 200, { request: requestRecord });
-        return;
-      }
-
-      if (request.method === "POST" && url.pathname === "/v1/invites/approve") {
-        const body = await readJsonBody(request);
-        const result = await store.approveInvite(body);
+        const result = await store.createQrInvite(body);
         sendJson(response, 200, result);
         return;
       }

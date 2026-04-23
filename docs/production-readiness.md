@@ -7,7 +7,8 @@ This repository is a production-track prototype, not an audited production messe
 Implemented now:
 
 - server-blind encrypted `1:1` envelopes;
-- invite-only phone onboarding with sponsor approval and a 5-digit out-of-band code;
+- QR-only phone onboarding with sponsor approval and high-entropy invite secrets;
+- forgotten-password reset through replacement QR invites from the original inviter;
 - password-protected login and linked-device registration;
 - signed prekey and one-time prekey bootstrap prototype;
 - per-device DH-ratcheted message chains;
