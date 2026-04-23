@@ -12,7 +12,9 @@ import {
 } from "./ratchet.js";
 import {
   ackEnvelope,
+  bootstrapAccount,
   claimPreKey,
+  completeRegistration,
   enqueueEnvelope,
   lookupAccount,
   pullQueue,
@@ -77,14 +79,49 @@ async function emitDeliveryAck({
   await api.enqueueEnvelope(baseUrl, ackMessage, targetDevice.inboxId);
 }
 
-export async function registerState(baseUrl, state) {
-  const result = await registerDevice(baseUrl, state);
-  const nextState = mergeDirectoryRecord(state, result.account);
-  nextState.device = {
-    ...nextState.device,
-    registeredAt: result.account.devices[state.device.deviceId].registeredAt,
+function applyRegisteredAccount(state, account) {
+  return {
+    ...mergeDirectoryRecord(state, account),
+    account: {
+      ...state.account,
+      phone: account.phone,
+      status: account.status,
+      invitedByAccountId: account.invitedByAccountId || null,
+    },
+    device: {
+      ...state.device,
+      registeredAt: account.devices[state.device.deviceId].registeredAt,
+    },
   };
-  return nextState;
+}
+
+export async function bootstrapState(baseUrl, state, { phone, password, passwordConfirm }) {
+  const result = await bootstrapAccount(baseUrl, state, {
+    phone,
+    password,
+    passwordConfirm,
+  });
+  return applyRegisteredAccount(state, result.account);
+}
+
+export async function completeRegistrationState(
+  baseUrl,
+  state,
+  { requestId, code, phone, password, passwordConfirm },
+) {
+  const result = await completeRegistration(baseUrl, state, {
+    requestId,
+    code,
+    phone,
+    password,
+    passwordConfirm,
+  });
+  return applyRegisteredAccount(state, result.account);
+}
+
+export async function registerState(baseUrl, state, password) {
+  const result = await registerDevice(baseUrl, state, password);
+  return applyRegisteredAccount(state, result.account);
 }
 
 export async function sendTextMessage({
@@ -312,12 +349,39 @@ export async function syncInboxWithApi({
   };
 }
 
-export async function registerStateWithApi({ baseUrl, state, api }) {
-  const result = await api.registerDevice(baseUrl, state);
-  const nextState = mergeDirectoryRecord(state, result.account);
-  nextState.device = {
-    ...nextState.device,
-    registeredAt: result.account.devices[state.device.deviceId].registeredAt,
-  };
-  return nextState;
+export async function registerStateWithApi({ baseUrl, state, api, password }) {
+  const result = await api.registerDevice(baseUrl, state, password);
+  return applyRegisteredAccount(state, result.account);
+}
+
+export async function bootstrapStateWithApi({
+  baseUrl,
+  state,
+  api,
+  phone,
+  password,
+  passwordConfirm,
+}) {
+  const result = await api.bootstrapAccount(baseUrl, state, password, passwordConfirm, phone);
+  return applyRegisteredAccount(state, result.account);
+}
+
+export async function completeRegistrationStateWithApi({
+  baseUrl,
+  state,
+  api,
+  requestId,
+  code,
+  phone,
+  password,
+  passwordConfirm,
+}) {
+  const result = await api.completeRegistration(baseUrl, state, {
+    requestId,
+    code,
+    phone,
+    password,
+    passwordConfirm,
+  });
+  return applyRegisteredAccount(state, result.account);
 }

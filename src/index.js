@@ -4,6 +4,8 @@ export * from "./policy.js";
 export * from "./storage.js";
 export * from "./util.js";
 export * from "./client/identity.js";
+export * from "./client/pqxdh.js";
 export * from "./client/ratchet.js";
 export * from "./client/recovery.js";
+export * from "./client/x3dh.js";
 export * from "./server/transparency.js";

@@ -1,9 +1,12 @@
 export function createDirectApi(store) {
   return {
-    async registerDevice(_, state) {
-      const account = await store.registerDevice({
+    async bootstrapAccount(_, state, password, passwordConfirm, phone) {
+      const account = await store.bootstrapAccount({
         accountId: state.account.accountId,
         displayName: state.account.displayName,
+        phone,
+        password,
+        passwordConfirm,
         device: {
           deviceId: state.device.deviceId,
           inboxId: state.device.inboxId,
@@ -17,6 +20,83 @@ export function createDirectApi(store) {
             publicKeyPem: preKey.publicKeyPem,
           })),
         },
+      });
+
+      return { account };
+    },
+
+    async registerDevice(_, state, password) {
+      const account = await store.registerDevice({
+        accountId: state.account.accountId,
+        displayName: state.account.displayName,
+        password,
+        device: {
+          deviceId: state.device.deviceId,
+          inboxId: state.device.inboxId,
+          dhPublicKeyPem: state.device.dhPublicKeyPem,
+          signingPublicKeyPem: state.device.signingPublicKeyPem,
+          signedPreKeyId: state.device.signedPreKeyId,
+          signedPreKeyPublicPem: state.device.signedPreKeyPublicPem,
+          signedPreKeySignatureB64: state.device.signedPreKeySignatureB64,
+          oneTimePreKeys: (state.device.oneTimePreKeys || []).map((preKey) => ({
+            keyId: preKey.keyId,
+            publicKeyPem: preKey.publicKeyPem,
+          })),
+        },
+      });
+
+      return { account };
+    },
+
+    async requestInvite(_, phone, sponsorPhone) {
+      const request = await store.requestInvite({
+        phone,
+        sponsorPhone,
+      });
+
+      return { request };
+    },
+
+    async approveInvite(_, sponsorAccountId, requestId) {
+      const result = await store.approveInvite({
+        sponsorAccountId,
+        requestId,
+      });
+
+      return result;
+    },
+
+    async completeRegistration(_, state, { requestId, code, phone, password, passwordConfirm }) {
+      const account = await store.completeRegistration({
+        requestId,
+        code,
+        accountId: state.account.accountId,
+        displayName: state.account.displayName,
+        phone,
+        password,
+        passwordConfirm,
+        device: {
+          deviceId: state.device.deviceId,
+          inboxId: state.device.inboxId,
+          dhPublicKeyPem: state.device.dhPublicKeyPem,
+          signingPublicKeyPem: state.device.signingPublicKeyPem,
+          signedPreKeyId: state.device.signedPreKeyId,
+          signedPreKeyPublicPem: state.device.signedPreKeyPublicPem,
+          signedPreKeySignatureB64: state.device.signedPreKeySignatureB64,
+          oneTimePreKeys: (state.device.oneTimePreKeys || []).map((preKey) => ({
+            keyId: preKey.keyId,
+            publicKeyPem: preKey.publicKeyPem,
+          })),
+        },
+      });
+
+      return { account };
+    },
+
+    async loginByPhone(_, phone, password) {
+      const account = store.loginByPhone({
+        phone,
+        password,
       });
 
       return { account };

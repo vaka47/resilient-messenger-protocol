@@ -18,6 +18,8 @@ Current prototype invariant:
 - registration and revocation are written to an append-only key transparency hash chain;
 - recovery bundles encrypt local account/device key material before export;
 - device fingerprints can be verified by users;
+- account signup is invite-only, phone numbers are unique, and linked devices require the account password;
+- relay enqueue rejects envelopes for unknown senders, unknown recipients, revoked devices, and inboxes not addressed by the envelope;
 - revoked devices are filtered from future fanout and cannot pull their old relay queue.
 
 ## What The Prototype Protects
@@ -38,6 +40,7 @@ This repository is not yet production E2EE. Missing pieces:
 - no MLS group encryption;
 - no production key transparency service with consistency proofs, monitoring, and gossip;
 - no hardened production revocation UX;
+- no production phone-number verification, login rate limiting, or abuse-prevention gateway;
 - no hardware-backed or rate-limited secure backup/recovery flow;
 - no push notification privacy design;
 - no audited implementation.

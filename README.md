@@ -11,6 +11,8 @@ The project explores a practical question: what should a messenger do when norma
 
 - Transport-agnostic encrypted envelopes.
 - File-backed directory and relay server.
+- Invite-only phone onboarding with sponsor approval and a 5-digit out-of-band code.
+- Password-protected account login and linked-device registration.
 - Local device identity with linked devices.
 - Multi-device recipient fanout.
 - Delivery acknowledgements back to the sender.
@@ -22,6 +24,7 @@ The project explores a practical question: what should a messenger do when norma
 - Encrypted local recovery bundle for account/device key material.
 - Device fingerprints for manual verification.
 - Device revocation enforcement.
+- Relay-side sender, recipient, and addressed-inbox validation.
 - Local append-only event history.
 - CLI demo and end-to-end tests.
 - Explicit security model and production crypto roadmap.
@@ -54,7 +57,9 @@ Detailed docs:
 
 - [Protocol v1](docs/protocol-v1.md)
 - [Architecture](docs/architecture.md)
+- [Account and invite model](docs/account-model.md)
 - [Security model](docs/security-model.md)
+- [Mobile runbook](docs/mobile-runbook.md)
 - [Crypto roadmap](docs/crypto-roadmap.md)
 - [Group security boundary](docs/group-security.md)
 - [Production readiness](docs/production-readiness.md)
@@ -71,7 +76,9 @@ Implemented:
 
 - local device identity;
 - linked devices for one account;
-- directory registration;
+- owner bootstrap, phone-based invite requests, sponsor approval, and invite-code completion;
+- password verification for login and linked-device registration;
+- directory registration that publishes only public device and prekey material;
 - relay queue delivery with encrypted delivery ack;
 - signed and encrypted `1:1` envelopes;
 - signed prekey and one-time prekey directory bootstrap;
@@ -81,16 +88,17 @@ Implemented:
 - encrypted recovery bundle export/restore for local device key material;
 - device fingerprint verification helpers;
 - revoked-device filtering and relay queue purge;
+- strict relay checks that reject unknown senders, unknown recipients, revoked devices, and inboxes not addressed by the envelope;
 - multi-device recipient fanout;
 - local event history on each device;
-- end-to-end tests for send, receive, decrypt, ack, and status update.
+- end-to-end tests for onboarding, password failures, send, receive, decrypt, ack, revocation, and status update.
 
 Not implemented yet:
 
 - production Double Ratchet sessions;
 - MLS group encryption;
 - nearby Bluetooth/Wi-Fi transport;
-- Android/iOS client;
+- production Android/iOS distributable clients;
 - push notifications;
 - hardened device recovery and revocation UX.
 
@@ -126,25 +134,52 @@ Start the relay and directory server:
 npm run server -- --port 8080
 ```
 
-Initialize and register Alice:
+Initialize Alice and bootstrap the first owner account:
 
 ```bash
 node src/cli.js init --state-dir ./state/alice --name Alice
-node src/cli.js register --state-dir ./state/alice --base-url http://127.0.0.1:8080
+node src/cli.js bootstrap-owner --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000001 --password "alice-password-123" --password-confirm "alice-password-123"
 ```
 
-Initialize and register Bob:
+Bob installs the app, initializes local state, and requests access through Alice's phone number:
 
 ```bash
 node src/cli.js init --state-dir ./state/bob --name Bob
-node src/cli.js register --state-dir ./state/bob --base-url http://127.0.0.1:8080
+node src/cli.js request-invite --base-url http://127.0.0.1:8080 --phone +10000000002 --sponsor-phone +10000000001
+```
+
+Alice approves Bob's request and reads the 5-digit code to Bob out-of-band:
+
+```bash
+node src/cli.js approve-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --request-id REQUEST_ID
+```
+
+Bob completes registration with the exact phone number, 5-digit code, and confirmed password:
+
+```bash
+node src/cli.js complete-registration --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --code 12345 --phone +10000000002 --password "bob-password-123" --password-confirm "bob-password-123"
 ```
 
 Add Bob's second device:
 
 ```bash
 node src/cli.js link-device --from-state-dir ./state/bob --state-dir ./state/bob-laptop
-node src/cli.js register --state-dir ./state/bob-laptop --base-url http://127.0.0.1:8080
+node src/cli.js register --state-dir ./state/bob-laptop --base-url http://127.0.0.1:8080 --password "bob-password-123"
+```
+
+Bob can now sponsor the next user, for example Carol:
+
+```bash
+node src/cli.js init --state-dir ./state/carol --name Carol
+node src/cli.js request-invite --base-url http://127.0.0.1:8080 --phone +10000000003 --sponsor-phone +10000000002
+node src/cli.js approve-invite --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID
+node src/cli.js complete-registration --state-dir ./state/carol --base-url http://127.0.0.1:8080 --request-id CAROL_REQUEST_ID --code 12345 --phone +10000000003 --password "carol-password-123" --password-confirm "carol-password-123"
+```
+
+Login check after logout:
+
+```bash
+node src/cli.js login --base-url http://127.0.0.1:8080 --phone +10000000002 --password "bob-password-123"
 ```
 
 Send a message from Alice to Bob:
@@ -220,6 +255,7 @@ This repository is designed to show:
 
 - distributed systems thinking;
 - security boundary design;
+- strict account onboarding and delivery authorization;
 - server-light architecture;
 - testable protocol modeling;
 - product strategy around resilience and cost.

@@ -49,6 +49,41 @@ export function createProtocolServer({ store }) {
         return;
       }
 
+      if (request.method === "POST" && url.pathname === "/v1/accounts/bootstrap") {
+        const body = await readJsonBody(request);
+        const account = await store.bootstrapAccount(body);
+        sendJson(response, 200, { account });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/invites/request") {
+        const body = await readJsonBody(request);
+        const requestRecord = await store.requestInvite(body);
+        sendJson(response, 200, { request: requestRecord });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/invites/approve") {
+        const body = await readJsonBody(request);
+        const result = await store.approveInvite(body);
+        sendJson(response, 200, result);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/accounts/complete-registration") {
+        const body = await readJsonBody(request);
+        const account = await store.completeRegistration(body);
+        sendJson(response, 200, { account });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/accounts/login") {
+        const body = await readJsonBody(request);
+        const account = store.loginByPhone(body);
+        sendJson(response, 200, { account });
+        return;
+      }
+
       if (request.method === "POST" && url.pathname === "/v1/directory/revoke") {
         const body = await readJsonBody(request);
         const account = await store.revokeDevice(body);

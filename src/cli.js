@@ -3,10 +3,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { fetchStats, fetchTransparencyLog, revokeDevice } from "./client/api.js";
+import {
+  approveInvite,
+  fetchStats,
+  fetchTransparencyLog,
+  loginByPhone,
+  requestInvite,
+  revokeDevice,
+} from "./client/api.js";
 import { computeDeviceFingerprint, verifyDeviceFingerprint } from "./client/identity.js";
 import { createRecoveryBundle, openRecoveryBundle } from "./client/recovery.js";
-import { registerState, sendTextMessage, syncInbox } from "./client/workflow.js";
+import {
+  bootstrapState,
+  completeRegistrationState,
+  registerState,
+  sendTextMessage,
+  syncInbox,
+} from "./client/workflow.js";
 import {
   getStateFilePath,
   initLocalState,
@@ -26,7 +39,12 @@ function printHelp() {
   server --port 8080 --host 127.0.0.1 --data-file ./data/server-state.json
   init --state-dir ./state/alice --name Alice [--force]
   link-device --from-state-dir ./state/bob-phone --state-dir ./state/bob-laptop [--force]
-  register --state-dir ./state/alice --base-url http://127.0.0.1:8080
+  bootstrap-owner --state-dir ./state/alice --base-url http://127.0.0.1:8080 --phone +10000000001 --password "long-password" --password-confirm "long-password"
+  request-invite --base-url http://127.0.0.1:8080 --phone +10000000002 --sponsor-phone +10000000001
+  approve-invite --state-dir ./state/alice --base-url http://127.0.0.1:8080 --request-id REQUEST_ID
+  complete-registration --state-dir ./state/bob --base-url http://127.0.0.1:8080 --request-id REQUEST_ID --code 12345 --phone +10000000002 --password "long-password" --password-confirm "long-password"
+  login --base-url http://127.0.0.1:8080 --phone +10000000002 --password "long-password"
+  register --state-dir ./state/alice --base-url http://127.0.0.1:8080 --password "long-password"
   fingerprint --state-dir ./state/alice --account-id ACCOUNT_ID --device-id DEVICE_ID
   verify-device --state-dir ./state/alice --account-id ACCOUNT_ID --device-id DEVICE_ID --fingerprint FINGERPRINT
   revoke-device --state-dir ./state/bob-phone --base-url http://127.0.0.1:8080 --device-id DEVICE_ID
@@ -98,12 +116,107 @@ async function main() {
   if (command === "register") {
     const stateDir = path.resolve(requireFlag(flags, "state-dir"));
     const baseUrl = requireFlag(flags, "base-url");
+    const password = requireFlag(flags, "password");
     const state = await loadLocalState(stateDir);
-    const nextState = await registerState(baseUrl, state);
+    const nextState = await registerState(baseUrl, state, password);
     await saveLocalState(stateDir, nextState);
     printJson({
       accountId: nextState.account.accountId,
       registeredAt: nextState.device.registeredAt,
+    });
+    return;
+  }
+
+  if (command === "bootstrap-owner") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const baseUrl = requireFlag(flags, "base-url");
+    const phone = requireFlag(flags, "phone");
+    const password = requireFlag(flags, "password");
+    const passwordConfirm = requireFlag(flags, "password-confirm");
+    const state = await loadLocalState(stateDir);
+    const nextState = await bootstrapState(baseUrl, state, {
+      phone,
+      password,
+      passwordConfirm,
+    });
+    await saveLocalState(stateDir, nextState);
+    printJson({
+      accountId: nextState.account.accountId,
+      phone: nextState.account.phone,
+      status: nextState.account.status,
+    });
+    return;
+  }
+
+  if (command === "request-invite") {
+    const baseUrl = requireFlag(flags, "base-url");
+    const phone = requireFlag(flags, "phone");
+    const sponsorPhone = requireFlag(flags, "sponsor-phone");
+    const result = await requestInvite(baseUrl, {
+      phone,
+      sponsorPhone,
+    });
+    printJson(result);
+    return;
+  }
+
+  if (command === "approve-invite") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const baseUrl = requireFlag(flags, "base-url");
+    const requestId = requireFlag(flags, "request-id");
+    const state = await loadLocalState(stateDir);
+    const result = await approveInvite(baseUrl, {
+      sponsorAccountId: state.account.accountId,
+      requestId,
+    });
+    printJson({
+      requestId: result.request.requestId,
+      phone: result.request.phone,
+      code: result.code,
+      expiresAt: result.request.expiresAt,
+    });
+    return;
+  }
+
+  if (command === "complete-registration") {
+    const stateDir = path.resolve(requireFlag(flags, "state-dir"));
+    const baseUrl = requireFlag(flags, "base-url");
+    const requestId = requireFlag(flags, "request-id");
+    const code = requireFlag(flags, "code");
+    const phone = requireFlag(flags, "phone");
+    const password = requireFlag(flags, "password");
+    const passwordConfirm = requireFlag(flags, "password-confirm");
+    const state = await loadLocalState(stateDir);
+    const nextState = await completeRegistrationState(baseUrl, state, {
+      requestId,
+      code,
+      phone,
+      password,
+      passwordConfirm,
+    });
+    await saveLocalState(stateDir, nextState);
+    printJson({
+      accountId: nextState.account.accountId,
+      phone: nextState.account.phone,
+      status: nextState.account.status,
+      invitedByAccountId: nextState.account.invitedByAccountId,
+    });
+    return;
+  }
+
+  if (command === "login") {
+    const baseUrl = requireFlag(flags, "base-url");
+    const phone = requireFlag(flags, "phone");
+    const password = requireFlag(flags, "password");
+    const result = await loginByPhone(baseUrl, {
+      phone,
+      password,
+    });
+    printJson({
+      accountId: result.account.accountId,
+      phone: result.account.phone,
+      status: result.account.status,
+      devices: Object.keys(result.account.devices || {}).length,
     });
     return;
   }

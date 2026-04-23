@@ -71,7 +71,7 @@ Each account owns:
 - one or more device keys;
 - a rotating set of inbox descriptors.
 
-Phone number is optional and external to core identity. Identity is anchored in keys, not in a server-side username.
+Core identity is anchored in keys, not in a server-side username. The current MVP also binds each active account to one unique phone number for invite-based onboarding and human-readable sponsorship.
 
 ### 4.2 Crypto session layer
 
@@ -208,6 +208,9 @@ This service should be tiny and strongly verifiable.
 
 Current prototype:
 
+- bootstraps only the first owner directly;
+- accepts new accounts only through sponsor-approved phone invites and 5-digit out-of-band codes;
+- requires account password verification for login and linked-device registration;
 - publishes only public device and prekey material;
 - consumes one-time prekeys during session bootstrap;
 - appends registration and revocation events to a verifiable hash-chain transparency log.
@@ -257,8 +260,9 @@ Production recovery must add hardware-backed storage, rate limiting or secret sh
 ### 9.2 Relay
 
 1. Relay accepts only encrypted envelope and queue metadata.
-2. Relay stores until ack, expiry, or retention ceiling.
-3. Relay may forward to downstream relay or waiting device.
+2. Relay rejects unknown sender devices, unknown recipient inboxes, revoked devices, and inboxes not listed in the envelope recipients.
+3. Relay stores until ack, expiry, or retention ceiling.
+4. Relay may forward to downstream relay or waiting device.
 
 ### 9.3 Receive
 

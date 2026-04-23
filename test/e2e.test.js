@@ -10,7 +10,13 @@ import {
   loadLocalState,
   saveLocalState,
 } from "../src/client/state.js";
-import { registerStateWithApi, sendTextMessage, syncInboxWithApi } from "../src/client/workflow.js";
+import {
+  bootstrapStateWithApi,
+  completeRegistrationStateWithApi,
+  registerStateWithApi,
+  sendTextMessage,
+  syncInboxWithApi,
+} from "../src/client/workflow.js";
 import { createDirectApi } from "../src/server/direct-api.js";
 import { FileBackedStateStore } from "../src/server/state-store.js";
 
@@ -39,22 +45,43 @@ test("end-to-end send fans out to multiple devices and returns delivery acks", a
     targetStateDir: bobLaptopDir,
   });
 
-  alice = await registerStateWithApi({
+  alice = await bootstrapStateWithApi({
     baseUrl: "memory://protocol",
     state: alice,
     api,
+    phone: "+10000000001",
+    password: "alice-password-123",
+    passwordConfirm: "alice-password-123",
   });
 
-  bobPhone = await registerStateWithApi({
+  const inviteRequest = await api.requestInvite(
+    "memory://protocol",
+    "+10000000002",
+    "+10000000001",
+  );
+  const approval = await api.approveInvite(
+    "memory://protocol",
+    alice.account.accountId,
+    inviteRequest.request.requestId,
+  );
+  assert.match(approval.code, /^\d{5}$/);
+
+  bobPhone = await completeRegistrationStateWithApi({
     baseUrl: "memory://protocol",
     state: bobPhone,
     api,
+    requestId: inviteRequest.request.requestId,
+    code: approval.code,
+    phone: "+10000000002",
+    password: "bob-password-123",
+    passwordConfirm: "bob-password-123",
   });
 
   bobLaptop = await registerStateWithApi({
     baseUrl: "memory://protocol",
     state: bobLaptop,
     api,
+    password: "bob-password-123",
   });
 
   await saveLocalState(aliceDir, alice);
@@ -160,20 +187,39 @@ test("revoked devices stop receiving queued and future envelopes", async () => {
     targetStateDir: bobLaptopDir,
   });
 
-  alice = await registerStateWithApi({
+  alice = await bootstrapStateWithApi({
     baseUrl: "memory://protocol",
     state: alice,
     api,
+    phone: "+10000000011",
+    password: "alice-password-123",
+    passwordConfirm: "alice-password-123",
   });
-  bobPhone = await registerStateWithApi({
+  const inviteRequest = await api.requestInvite(
+    "memory://protocol",
+    "+10000000012",
+    "+10000000011",
+  );
+  const approval = await api.approveInvite(
+    "memory://protocol",
+    alice.account.accountId,
+    inviteRequest.request.requestId,
+  );
+  bobPhone = await completeRegistrationStateWithApi({
     baseUrl: "memory://protocol",
     state: bobPhone,
     api,
+    requestId: inviteRequest.request.requestId,
+    code: approval.code,
+    phone: "+10000000012",
+    password: "bob-password-123",
+    passwordConfirm: "bob-password-123",
   });
   bobLaptop = await registerStateWithApi({
     baseUrl: "memory://protocol",
     state: bobLaptop,
     api,
+    password: "bob-password-123",
   });
 
   const beforeRevocation = await sendTextMessage({

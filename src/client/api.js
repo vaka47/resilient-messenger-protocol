@@ -8,7 +8,7 @@ async function parseJsonResponse(response) {
   return data;
 }
 
-export async function registerDevice(baseUrl, state) {
+export async function registerDevice(baseUrl, state, password) {
   const response = await fetch(`${baseUrl}/v1/directory/register`, {
     method: "POST",
     headers: {
@@ -17,6 +17,7 @@ export async function registerDevice(baseUrl, state) {
     body: JSON.stringify({
       accountId: state.account.accountId,
       displayName: state.account.displayName,
+      password,
       device: {
         deviceId: state.device.deviceId,
         inboxId: state.device.inboxId,
@@ -30,6 +31,119 @@ export async function registerDevice(baseUrl, state) {
           publicKeyPem: preKey.publicKeyPem,
         })),
       },
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function bootstrapAccount(baseUrl, state, { phone, password, passwordConfirm }) {
+  const response = await fetch(`${baseUrl}/v1/accounts/bootstrap`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      accountId: state.account.accountId,
+      displayName: state.account.displayName,
+      phone,
+      password,
+      passwordConfirm,
+      device: {
+        deviceId: state.device.deviceId,
+        inboxId: state.device.inboxId,
+        dhPublicKeyPem: state.device.dhPublicKeyPem,
+        signingPublicKeyPem: state.device.signingPublicKeyPem,
+        signedPreKeyId: state.device.signedPreKeyId,
+        signedPreKeyPublicPem: state.device.signedPreKeyPublicPem,
+        signedPreKeySignatureB64: state.device.signedPreKeySignatureB64,
+        oneTimePreKeys: (state.device.oneTimePreKeys || []).map((preKey) => ({
+          keyId: preKey.keyId,
+          publicKeyPem: preKey.publicKeyPem,
+        })),
+      },
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function requestInvite(baseUrl, { phone, sponsorPhone }) {
+  const response = await fetch(`${baseUrl}/v1/invites/request`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      phone,
+      sponsorPhone,
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function approveInvite(baseUrl, { sponsorAccountId, requestId }) {
+  const response = await fetch(`${baseUrl}/v1/invites/approve`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      sponsorAccountId,
+      requestId,
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function completeRegistration(
+  baseUrl,
+  state,
+  { requestId, code, phone, password, passwordConfirm },
+) {
+  const response = await fetch(`${baseUrl}/v1/accounts/complete-registration`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      requestId,
+      code,
+      accountId: state.account.accountId,
+      displayName: state.account.displayName,
+      phone,
+      password,
+      passwordConfirm,
+      device: {
+        deviceId: state.device.deviceId,
+        inboxId: state.device.inboxId,
+        dhPublicKeyPem: state.device.dhPublicKeyPem,
+        signingPublicKeyPem: state.device.signingPublicKeyPem,
+        signedPreKeyId: state.device.signedPreKeyId,
+        signedPreKeyPublicPem: state.device.signedPreKeyPublicPem,
+        signedPreKeySignatureB64: state.device.signedPreKeySignatureB64,
+        oneTimePreKeys: (state.device.oneTimePreKeys || []).map((preKey) => ({
+          keyId: preKey.keyId,
+          publicKeyPem: preKey.publicKeyPem,
+        })),
+      },
+    }),
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function loginByPhone(baseUrl, { phone, password }) {
+  const response = await fetch(`${baseUrl}/v1/accounts/login`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      phone,
+      password,
     }),
   });
 

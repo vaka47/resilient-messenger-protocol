@@ -18,14 +18,14 @@ flowchart TB
     B2["Bob laptop"]
   end
 
-  Directory["Directory service\npublic keys, device ids, inbox ids"]
+  Directory["Directory service\naccounts, invites, public keys, inbox ids"]
   Relay["Relay service\ntemporary encrypted queues"]
   Transparency["Transparency log\ndevice lifecycle hash chain"]
   LocalLogs["Local event logs\nsource of durable history"]
 
-  A1 -->|"register device"| Directory
-  B1 -->|"register device"| Directory
-  B2 -->|"register linked device"| Directory
+  A1 -->|"bootstrap owner"| Directory
+  B1 -->|"request invite, complete with code"| Directory
+  B2 -->|"register linked device with password"| Directory
 
   A1 -->|"lookup Bob devices"| Directory
   A1 -->|"sealed envelope per device"| Relay
@@ -55,6 +55,9 @@ flowchart TB
 Directory service:
 
 - account records;
+- unique phone index;
+- invite requests and sponsor approvals;
+- password hashes for login and linked-device registration;
 - device descriptors;
 - public encryption and signing keys;
 - signed prekey bundles;
@@ -69,6 +72,7 @@ Relay service:
 - expiry timestamps;
 - delivery acknowledgement removal.
 - revoked inbox purge.
+- active sender and addressed recipient validation.
 
 The server must not store:
 
@@ -76,6 +80,7 @@ The server must not store:
 - private keys;
 - permanent chat history.
 - private recovery passphrases or unencrypted recovery bundles.
+- password plaintext.
 
 ## Scaling Model
 

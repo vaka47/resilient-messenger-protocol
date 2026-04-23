@@ -7,14 +7,21 @@ This repository is a production-track prototype, not an audited production messe
 Implemented now:
 
 - server-blind encrypted `1:1` envelopes;
+- invite-only phone onboarding with sponsor approval and a 5-digit out-of-band code;
+- password-protected login and linked-device registration;
 - signed prekey and one-time prekey bootstrap prototype;
 - per-device DH-ratcheted message chains;
 - skipped-message key cache for limited out-of-order delivery;
 - device fingerprint verification helpers;
 - revocation enforcement in directory and relay;
+- strict relay validation for active senders, active addressed recipients, and revoked devices;
 - key transparency hash-chain for device registration and revocation;
 - encrypted local recovery bundle for account/device key material;
-- executable tests for encryption, ratchet behavior, fanout, revocation, transparency, and recovery.
+- executable tests for account onboarding, password failures, delivery authorization, encryption, ratchet behavior, fanout, revocation, transparency, and recovery.
+
+## Mobile Status
+
+This repository is not yet a signed mobile product. It can run the protocol/server locally and has passing security tests, but the current workspace does not include a mobile app project or Android build toolchain. See `docs/mobile-runbook.md` for the minimum iOS/Android path and acceptance checklist.
 
 ## Required Before Production Security Claims
 
@@ -94,4 +101,3 @@ Unsafe claim:
 > This is safer than Signal, Telegram, or WhatsApp today.
 
 That requires audited, spec-faithful cryptographic components and production clients.
-
